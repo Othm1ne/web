@@ -68,4 +68,13 @@ export const SCHEMA = [
     fetched_at timestamptz not null
   )`,
   `alter table music_cache enable row level security`,
+  // Solo games in progress (serverless instances don't share memory).
+  `create table if not exists live_games (
+    id uuid primary key,
+    user_id uuid not null,
+    state jsonb not null,
+    version integer not null default 0,
+    created_at timestamptz not null default now()
+  )`,
+  `alter table live_games enable row level security`,
 ];

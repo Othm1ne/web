@@ -1,31 +1,33 @@
-// Live games stay in memory (they last minutes); finished games go to Postgres.
+// Games in progress and finished results, both in Postgres (serverless instances share nothing).
 import { getDb } from "../db";
+import { type LoadedGame, insertLiveGame, loadLiveGame, updateLiveGame } from "../db/liveGames";
 import * as repo from "../db/repo";
 import type { GameSummary } from "../types";
 import { Game, GameError, summarize, totalScore } from "./engine";
 import { type BoardFilter, rankOf, rankPlayers } from "./leaderboard";
 
-const GAME_TTL_MS = 3 * 60 * 60 * 1000;
-const holder = globalThis as unknown as { __games?: Map<string, Game> };
-const games = (holder.__games ??= new Map<string, Game>());
+export type { LoadedGame };
 
-export function saveGame(game: Game) {
-  const cutoff = Date.now() - GAME_TTL_MS;
-  for (const [id, g] of games) if (g.createdAt < cutoff) games.delete(id);
-  games.set(game.id, game);
+export async function saveNewGame(game: Game) {
+  await insertLiveGame(await getDb(), game);
 }
 
-export function getGame(id: string): Game {
-  const game = games.get(id);
-  if (!game) throw new GameError("game_not_found", 404);
-  return game;
+export async function getGame(id: string): Promise<LoadedGame> {
+  const loaded = await loadLiveGame(await getDb(), id);
+  if (!loaded) throw new GameError("game_not_found", 404);
+  return loaded;
 }
 
 /** A game only its player can play; other sessions get the same 404 as a missing game. */
-export function getOwnGame(id: string, userId: string): Game {
-  const game = getGame(id);
-  if (game.player.id !== userId) throw new GameError("game_not_found", 404);
-  return game;
+export async function getOwnGame(id: string, userId: string): Promise<LoadedGame> {
+  const loaded = await getGame(id);
+  if (loaded.game.player.id !== userId) throw new GameError("game_not_found", 404);
+  return loaded;
+}
+
+/** Persists changes made to a loaded game; fails with 409 if it changed meanwhile. */
+export async function saveGame(loaded: LoadedGame) {
+  await updateLiveGame(await getDb(), loaded);
 }
 
 export async function recordResult(game: Game) {

@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/session";
 // Proxies the clip so the client never sees the preview URL (which identifies the track).
 export const GET = route(async (_req: Request, ctx: RouteContext<"/api/games/[id]/rounds/[index]/audio">) => {
   const { id, index } = await ctx.params;
-  const game = getOwnGame(id, (await requireUser()).id);
+  const { game } = await getOwnGame(id, (await requireUser()).id);
   const round = game.rounds[roundIndex(index)];
   if (!round) throw new GameError("bad_round");
   const upstream = await fetch(game.tracks.get(round.trackId)!.previewUrl, { cache: "no-store" });

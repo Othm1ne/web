@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { answerRound } from "@/lib/game/engine";
-import { getOwnGame, recordResult } from "@/lib/game/store";
+import { getOwnGame, recordResult, saveGame } from "@/lib/game/store";
 import { roundIndex, route } from "@/lib/http";
 import { requireUser } from "@/lib/session";
 
@@ -10,8 +10,10 @@ export const POST = route(async (req: Request, ctx: RouteContext<"/api/games/[id
   const now = Date.now();
   const { id, index } = await ctx.params;
   const { optionId } = Body.parse(await req.json());
-  const game = getOwnGame(id, (await requireUser()).id);
+  const loaded = await getOwnGame(id, (await requireUser()).id);
+  const { game } = loaded;
   const result = answerRound(game, roundIndex(index), optionId, now);
+  await saveGame(loaded);
   // A failed save must not cost the player their final reveal; the summary still works from memory.
   if (result.finished) await recordResult(game).catch((err) => console.error("recordResult failed", err));
   return Response.json(result);

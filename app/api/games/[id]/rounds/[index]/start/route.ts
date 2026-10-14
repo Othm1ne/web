@@ -1,9 +1,21 @@
 import { startRound } from "@/lib/game/engine";
-import { getOwnGame } from "@/lib/game/store";
+import { getOwnGame, saveGame } from "@/lib/game/store";
 import { roundIndex, route } from "@/lib/http";
 import { requireUser } from "@/lib/session";
 
 export const POST = route(async (_req: Request, ctx: RouteContext<"/api/games/[id]/rounds/[index]/start">) => {
   const { id, index } = await ctx.params;
-  return Response.json(startRound(getOwnGame(id, (await requireUser()).id), roundIndex(index)));
+  const i = roundIndex(index);
+  const userId = (await requireUser()).id;
+  const loaded = await getOwnGame(id, userId);
+  const alreadyStarted = loaded.game.rounds[i]?.startedAt !== undefined;
+  const started = startRound(loaded.game, i);
+  if (alreadyStarted) return Response.json(started);
+  try {
+    await saveGame(loaded);
+    return Response.json(started);
+  } catch {
+    // Another request started (or answered) it first: report the clock that was saved.
+    return Response.json(startRound((await getOwnGame(id, userId)).game, i));
+  }
 });
