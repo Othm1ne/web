@@ -20,8 +20,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Link href="/" aria-label="EarRush home">
             <Logo />
           </Link>
-          <nav className="flex items-center gap-2">
-            <Link href="/leaderboard" className="px-3 py-1.5 text-sm font-medium text-mute transition hover:text-white">
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <Link href="/join" className="px-2 py-1.5 text-sm font-medium text-mute transition hover:text-white sm:px-3">
+              Join
+            </Link>
+            <Link href="/leaderboard" className="px-2 py-1.5 text-sm font-medium text-mute transition hover:text-white sm:px-3">
               Leaderboard
             </Link>
             <Link

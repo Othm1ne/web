@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type User, createGame, ensureUser, googleSignInUrl, renameUser, signOut } from "@/lib/client";
+import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
 import type { ArtistSummary } from "@/lib/types";
 
 function ArtistCard({ artist, selected, onSelect }: { artist: ArtistSummary; selected: boolean; onSelect: () => void }) {
@@ -82,6 +82,18 @@ export default function PlayPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // Warm the server's track cache as soon as an artist is picked, so "Start" is instant.
+  function select(artist: ArtistSummary) {
+    setSelected(artist);
+    setError("");
+    fetch(`/api/artists/${artist.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.playable === false) setError(errorMessage("not_enough_tracks"));
+      })
+      .catch(() => {});
+  }
+
   async function start() {
     if (!selected || !user || starting) return;
     setStarting(true);
@@ -158,7 +170,7 @@ export default function PlayPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {list.map((a) => (
-              <ArtistCard key={a.id} artist={a} selected={selected?.id === a.id} onSelect={() => setSelected(a)} />
+              <ArtistCard key={a.id} artist={a} selected={selected?.id === a.id} onSelect={() => select(a)} />
             ))}
           </div>
         )}

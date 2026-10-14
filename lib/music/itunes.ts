@@ -58,6 +58,19 @@ function artistsFromSongs(items: ItunesItem[]): ArtistSummary[] {
   return [...byId.values()];
 }
 
+function toTrack(it: ItunesItem): Track | null {
+  if (it.wrapperType !== "track" || it.kind !== "song" || !it.previewUrl || !it.trackName || !it.trackId) return null;
+  return {
+    id: String(it.trackId),
+    title: it.trackName,
+    artist: it.artistName ?? "",
+    album: it.collectionName ?? "",
+    cover: artwork(it.artworkUrl100),
+    previewUrl: it.previewUrl,
+    ...(it.artistId ? { artistId: String(it.artistId) } : {}),
+  };
+}
+
 async function searchArtists(query: string): Promise<ArtistSummary[]> {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return [];
@@ -84,19 +97,12 @@ export const itunesProvider: MusicProvider = {
       const seen = new Set<string>();
       const tracks: Track[] = [];
       for (const it of items) {
-        if (it.wrapperType !== "track" || it.kind !== "song" || !it.previewUrl || !it.trackName) continue;
-        if (String(it.artistId) !== artistId) continue;
-        const key = normalizeTitle(it.trackName);
+        const track = toTrack(it);
+        if (!track || String(it.artistId) !== artistId) continue;
+        const key = normalizeTitle(track.title);
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        tracks.push({
-          id: String(it.trackId),
-          title: it.trackName,
-          artist: it.artistName ?? artistItem.artistName ?? "",
-          album: it.collectionName ?? "",
-          cover: artwork(it.artworkUrl100),
-          previewUrl: it.previewUrl,
-        });
+        tracks.push({ ...track, artist: track.artist || artistItem.artistName || "" });
       }
       const artist: ArtistSummary = {
         id: artistId,
@@ -106,4 +112,32 @@ export const itunesProvider: MusicProvider = {
       };
       return { artist, tracks };
     }),
+
+  searchTracks: async (query) => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return cached(`songs:${q}`, DAY, async () => {
+      const items = await call("search", { term: q, entity: "song", limit: "40" });
+      // The same song often appears on several albums; keep the first of each title + artist.
+      const seen = new Set<string>();
+      return items
+        .map(toTrack)
+        .filter((t): t is Track => t !== null)
+        .filter((t) => {
+          const key = `${normalizeTitle(t.title)}|${t.artist.toLowerCase()}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 20);
+    });
+  },
+
+  // Not cached: called once per event, and the preview URLs must be current.
+  tracksByIds: async (ids) => {
+    if (ids.length === 0) return [];
+    const items = await call("lookup", { id: ids.join(",") });
+    const byId = new Map(items.map(toTrack).filter((t): t is Track => t !== null).map((t) => [t.id, t]));
+    return ids.map((id) => byId.get(id)).filter((t): t is Track => Boolean(t));
+  },
 };

@@ -14,6 +14,7 @@ export const GET = route(async (_req: Request, ctx: RouteContext<"/api/games/[id
   return new Response(upstream.body, {
     headers: {
       "Content-Type": upstream.headers.get("content-type") ?? "audio/mp4",
+      ...(upstream.headers.get("content-length") ? { "Content-Length": upstream.headers.get("content-length")! } : {}),
       "Cache-Control": "private, no-store",
     },
   });

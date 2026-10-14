@@ -7,9 +7,14 @@ export type Track = {
   album: string;
   cover: string;
   previewUrl: string;
+  /** Catalog id of the main artist, when known (used to find similar wrong options). */
+  artistId?: string;
 };
 
 export type PublicOption = { id: string; title: string; cover: string };
+
+/** A song as shown to event hosts (no preview URL). */
+export type TrackSummary = Omit<Track, "previewUrl">;
 
 export type PublicRound = {
   index: number;

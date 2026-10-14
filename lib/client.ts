@@ -46,6 +46,28 @@ export function errorMessage(code?: string): string {
       return "Your session expired. Reload the page to continue.";
     case "invalid_request":
       return "Nicknames need 2 to 24 characters.";
+    case "event_not_found":
+      return "No event with that code. Check the code on the host's screen.";
+    case "event_over":
+      return "This event has ended.";
+    case "host_cannot_play":
+      return "You're hosting this event, so you can't join it as a player.";
+    case "host_needs_google":
+      return "Sign in with Google to host an event.";
+    case "no_players":
+      return "Wait for at least one player to join.";
+    case "not_enough_songs":
+      return "Pick at least 4 songs.";
+    case "too_many_songs":
+      return "An event can have at most 30 songs.";
+    case "duplicate_songs":
+      return "Two of your songs have the same title. Remove one of them.";
+    case "songs_unavailable":
+      return "Some songs are no longer available. Remove them and try again.";
+    case "already_answered":
+      return "You already answered this round.";
+    case "round_over":
+      return "Too late, the round is over.";
     default:
       return "Something went wrong. Please try again.";
   }

@@ -22,6 +22,9 @@ describe("match", () => {
     expect(normalizeTitle("Café (Remastered 2011)")).toBe("cafe");
     expect(normalizeTitle("Song Name - Live at Wembley")).toBe("song name");
     expect(normalizeTitle("Hello (feat. Someone)")).toBe("hello");
+    expect(normalizeTitle("Harder Better Faster Stronger (The Neptunes Remix)")).toBe("harder better faster stronger");
+    expect(normalizeTitle("Harder Better Faster Stronger (Alive 2007 Extended)")).toBe("harder better faster stronger");
+    expect(normalizeTitle("Song - Instrumental")).toBe("song");
   });
   it("accepts small typos and rejects other titles", () => {
     expect(isTitleMatch("midnigt city", "Midnight City")).toBe(true);

@@ -3,11 +3,39 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Equalizer } from "@/components/Logo";
+import { TimerRing } from "@/components/TimerRing";
 import { errorMessage } from "@/lib/client";
 import type { PublicGame, RevealResult } from "@/lib/types";
 
-type Phase = "loading" | "ready" | "countdown" | "playing" | "reveal" | "error";
+type Phase = "loading" | "ready" | "countdown" | "buffering" | "playing" | "reveal" | "error";
 const REVEAL_MS = 4000;
+const CLIP_CONCURRENCY = 2;
+
+/**
+ * Downloads clips in round order, a few at a time, so the first rounds are ready quickly and
+ * the rest arrive while the player is busy. Returns one promise per clip (an object URL).
+ */
+function loadClips(urls: string[], signal: AbortSignal, onLoaded: (index: number, url: string) => void): Promise<string>[] {
+  const slots = urls.map(() => Promise.withResolvers<string>());
+  slots.forEach((s) => s.promise.catch(() => {}));
+  let next = 0;
+  const worker = async () => {
+    while (next < urls.length) {
+      const i = next++;
+      try {
+        const res = await fetch(urls[i], { signal });
+        if (!res.ok) throw new Error("clip failed");
+        const url = URL.createObjectURL(await res.blob());
+        onLoaded(i, url);
+        slots[i].resolve(url);
+      } catch (e) {
+        slots[i].reject(e);
+      }
+    }
+  };
+  for (let k = 0; k < CLIP_CONCURRENCY; k++) worker();
+  return slots.map((s) => s.promise);
+}
 
 async function post<T>(url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -20,33 +48,11 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-function TimerRing({ remaining, total }: { remaining: number; total: number }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  const frac = Math.max(0, remaining / total);
-  const color = frac > 0.5 ? "var(--color-lime)" : frac > 0.25 ? "#facc15" : "var(--color-coral)";
-  return (
-    <div className="relative h-16 w-16">
-      <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
-        <circle cx="32" cy="32" r={r} stroke="var(--color-line)" strokeWidth="5" fill="none" />
-        <circle
-          cx="32" cy="32" r={r} stroke={color} strokeWidth="5" fill="none" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c * (1 - frac)}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center font-display text-xl font-bold">
-        {Math.ceil(remaining / 1000)}
-      </span>
-    </div>
-  );
-}
-
 export function GameClient() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [game, setGame] = useState<PublicGame | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
-  const [loaded, setLoaded] = useState(0);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const [count, setCount] = useState(3);
@@ -57,7 +63,8 @@ export function GameClient() {
   const [muted, setMuted] = useState(false);
 
   const audio = useRef<HTMLAudioElement | null>(null);
-  const clips = useRef<string[]>([]);
+  const clips = useRef<Promise<string>[]>([]);
+  const clipReady = useRef(new Set<number>());
   const timer = useRef<number | null>(null);
   const answering = useRef(false);
 
@@ -66,9 +73,11 @@ export function GameClient() {
     setPhase("error");
   };
 
-  // Load the game and preload every clip so rounds start instantly.
+  // Load the game, then fetch clips in the background; the first one is enough to start.
   useEffect(() => {
     let cancelled = false;
+    const abort = new AbortController();
+    const objectUrls: string[] = [];
     (async () => {
       const res = await fetch(`/api/games/${id}`);
       const data = await res.json();
@@ -77,18 +86,21 @@ export function GameClient() {
       if (g.finished) return router.replace(`/results/${id}`);
       if (g.rounds.some((r) => r.answered)) throw new Error("This game was already started. Start a new one.");
       setGame(g);
-      clips.current = await Promise.all(
-        g.rounds.map(async (r) => {
-          const blob = await (await fetch(r.audioUrl)).blob();
-          if (!cancelled) setLoaded((n) => n + 1);
-          return URL.createObjectURL(blob);
-        }),
+      clips.current = loadClips(
+        g.rounds.map((r) => r.audioUrl),
+        abort.signal,
+        (i, url) => {
+          objectUrls.push(url);
+          clipReady.current.add(i);
+        },
       );
+      await clips.current[0];
       if (!cancelled) setPhase("ready");
     })().catch((e) => !cancelled && fail(e));
     return () => {
       cancelled = true;
-      clips.current.forEach((u) => URL.revokeObjectURL(u));
+      abort.abort();
+      objectUrls.forEach((u) => URL.revokeObjectURL(u));
     };
   }, [id, router]);
 
@@ -126,11 +138,19 @@ export function GameClient() {
       setIndex(i);
       setPicked(null);
       setReveal(null);
+      // Normally already downloaded during earlier rounds; on a slow connection, wait for it.
+      let src: string;
+      if (!clipReady.current.has(i)) setPhase("buffering");
+      try {
+        src = await clips.current[i];
+      } catch {
+        return fail(new Error("A clip failed to load. Check your connection and start a new game."));
+      }
       setRemaining(game.roundMs);
       setPhase("playing");
       answering.current = false;
       const el = audio.current!;
-      el.src = clips.current[i];
+      el.src = src;
       el.currentTime = 0;
       await el.play().catch(() => {});
       try {
@@ -205,7 +225,7 @@ export function GameClient() {
       {phase === "loading" && (
         <div className="m-auto flex flex-col items-center gap-4">
           <Equalizer />
-          <p className="text-mute">Loading clips… {loaded}/10</p>
+          <p className="text-mute">Loading the first clip…</p>
         </div>
       )}
 
@@ -223,6 +243,13 @@ export function GameClient() {
           ) : (
             <span key={count} className="pop font-display text-7xl font-bold text-lime">{count}</span>
           )}
+        </div>
+      )}
+
+      {phase === "buffering" && (
+        <div className="m-auto flex flex-col items-center gap-4">
+          <Equalizer />
+          <p className="text-mute">Loading the next clip…</p>
         </div>
       )}
 

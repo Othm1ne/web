@@ -2,8 +2,9 @@
 // (e.g. remasters) and, later, to grade free-text answers.
 
 const BRACKETED_NOISE =
-  /\s*[([][^)\]]*\b(feat|ft|with|version|remaster(ed)?|live|edit|mix|mono|stereo|deluxe|bonus|from|acoustic|demo)\b[^)\]]*[)\]]/g;
-const DASH_SUFFIX_NOISE = /\s+-\s+.*\b(remaster(ed)?|version|live|edit|mix|mono|acoustic|demo)\b.*$/;
+  /\s*[([][^)\]]*\b(feat|ft|with|version|remaster(ed)?|live|edit|\w*mix(es)?|extended|instrumental|reprise|unplugged|mono|stereo|deluxe|bonus|from|acoustic|demo)\b[^)\]]*[)\]]/g;
+const DASH_SUFFIX_NOISE =
+  /\s+-\s+.*\b(remaster(ed)?|version|live|edit|\w*mix(es)?|extended|instrumental|reprise|unplugged|mono|acoustic|demo)\b.*$/;
 
 export function normalizeTitle(title: string): string {
   return title

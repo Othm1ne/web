@@ -36,17 +36,23 @@ export async function migrate(db: Db) {
   for (const statement of SCHEMA) await db.query(statement);
 }
 
-const holder = globalThis as unknown as { __db?: Promise<Db> };
+const holder = globalThis as unknown as { __db?: Promise<Db>; __migration?: { statements: number; done: Promise<void> } };
 
-export function getDb(): Promise<Db> {
-  holder.__db ??= connect()
-    .then(async (db) => {
-      await migrate(db);
-      return db;
-    })
-    .catch((err) => {
-      holder.__db = undefined;
+export async function getDb(): Promise<Db> {
+  holder.__db ??= connect().catch((err) => {
+    holder.__db = undefined;
+    throw err;
+  });
+  const db = await holder.__db;
+  // The connection outlives code reloads in development, so re-apply the schema whenever it
+  // has grown (statements are idempotent) instead of only on the first connection.
+  if (holder.__migration?.statements !== SCHEMA.length) {
+    const done = migrate(db).catch((err) => {
+      holder.__migration = undefined;
       throw err;
     });
-  return holder.__db;
+    holder.__migration = { statements: SCHEMA.length, done };
+  }
+  await holder.__migration!.done;
+  return db;
 }

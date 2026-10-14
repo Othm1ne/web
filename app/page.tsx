@@ -10,6 +10,7 @@ const STEPS = [
 const FAQ = [
   { q: "How is the score calculated?", a: "A correct answer is worth up to 100 points and loses 5 points per second you wait (minimum 55). Wrong answers and timeouts score 0. A game has 10 rounds." },
   { q: "Do I need an account?", a: "No. You play as a guest with a random nickname you can change anytime." },
+  { q: "Can I run a quiz night?", a: "Yes. Host a live event: pick the songs, share the code, and players join on their phones. Music can play on one big screen or on every phone. Hosting needs a Google sign-in." },
   { q: "Where does the music come from?", a: "Short previews from the Apple iTunes catalog, streamed for preview only." },
 ];
 
@@ -30,6 +31,14 @@ export default function Landing() {
         >
           Start playing
         </Link>
+        <div className="flex flex-wrap justify-center gap-3 text-sm">
+          <Link href="/host" className="rounded-full border border-line px-4 py-2 font-medium transition hover:border-cyan">
+            Host a live event
+          </Link>
+          <Link href="/join" className="rounded-full border border-line px-4 py-2 font-medium transition hover:border-cyan">
+            Join with a code
+          </Link>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
