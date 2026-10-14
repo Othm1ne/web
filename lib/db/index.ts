@@ -13,7 +13,8 @@ async function connect(): Promise<Db> {
   if (url) {
     const { default: postgres } = await import("postgres");
     // prepare: false keeps it compatible with transaction-mode poolers (Supabase port 6543).
-    const sql = postgres(url, { prepare: false, max: 5 });
+    // Few, short-lived connections: serverless instances are many and come and go.
+    const sql = postgres(url, { prepare: false, max: 3, idle_timeout: 20, connect_timeout: 10 });
     return {
       query: async <T>(text: string, params: unknown[] = []) =>
         (await sql.unsafe(text, params as never[])) as unknown as T[],

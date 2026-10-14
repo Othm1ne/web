@@ -4,7 +4,8 @@ import path from "node:path";
 import { GameError } from "../game/engine";
 import { normalizeTitle } from "../game/match";
 import type { ArtistSummary, Track } from "../types";
-import { type Cache, createCache } from "./cache";
+import { dbCacheStore } from "../db/cacheStore";
+import { type Cache, createCache, fileStore } from "./cache";
 import type { MusicProvider } from "./provider";
 
 const COUNTRY = process.env.MUSIC_COUNTRY ?? "US";
@@ -28,7 +29,11 @@ type ItunesItem = {
 
 const holder = globalThis as unknown as { __musicCache?: Cache };
 const cache = (holder.__musicCache ??= createCache(
-  process.env.NODE_ENV === "test" ? null : path.join(process.cwd(), "data", "music-cache.json"),
+  process.env.NODE_ENV === "test"
+    ? null
+    : process.env.DATABASE_URL
+      ? dbCacheStore
+      : fileStore(path.join(process.cwd(), "data", "music-cache.json")),
 ));
 const cached = cache.get;
 

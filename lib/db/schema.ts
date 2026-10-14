@@ -61,4 +61,11 @@ export const SCHEMA = [
   `alter table events enable row level security`,
   `alter table event_players enable row level security`,
   `alter table event_answers enable row level security`,
+  // iTunes responses, shared across serverless instances (see lib/music/cache.ts).
+  `create table if not exists music_cache (
+    key text primary key,
+    value jsonb not null,
+    fetched_at timestamptz not null
+  )`,
+  `alter table music_cache enable row level security`,
 ];
