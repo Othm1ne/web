@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { type User, ensureUser, errorMessage, googleSignInUrl } from "@/lib/client";
+import { SourceFill } from "@/components/host/SourceFill";
 import { type EventMode, MAX_CLIP_START_S } from "@/lib/event/types";
-import type { TrackSummary } from "@/lib/types";
+import { normalizeTitle } from "@/lib/game/match";
+import type { HostTrack } from "@/lib/types";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
 const MIN_SONGS = 4;
@@ -12,10 +14,16 @@ const MAX_SONGS = 30;
 /** Length of a round's answer window, i.e. how much of the clip players hear before time's up. */
 const CLIP_S = 10;
 
-type HostTrack = TrackSummary & { previewUrl: string };
 type Picked = HostTrack & { startSec: number };
 
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
+
+type AddTab = "search" | "artist" | "genre";
+const ADD_TABS: { id: AddTab; label: string }[] = [
+  { id: "search", label: "Search songs" },
+  { id: "artist", label: "From an artist" },
+  { id: "genre", label: "From a genre" },
+];
 
 const MODES: { id: EventMode; title: string; body: string }[] = [
   { id: "screen", title: "Big screen + phones", body: "Your screen plays the music and shows the choices. Players answer on their phones." },
@@ -34,6 +42,8 @@ export default function HostPage() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<{ q: string; tracks: HostTrack[] } | null>(null);
   const [picked, setPicked] = useState<Picked[]>([]);
+  const [addTab, setAddTab] = useState<AddTab>("search");
+  const [notice, setNotice] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -93,6 +103,26 @@ export default function HostPage() {
 
   const setStart = (id: string, startSec: number) =>
     setPicked((list) => list.map((x) => (x.id === id ? { ...x, startSec } : x)));
+
+  /** Appends songs from an artist or genre, skipping ones already picked (or same-titled), up to the limit. */
+  function addMany(tracks: HostTrack[], from: string) {
+    const ids = new Set(picked.map((t) => t.id));
+    const titles = new Set(picked.map((t) => normalizeTitle(t.title)));
+    const fresh: Picked[] = [];
+    for (const t of tracks) {
+      const key = normalizeTitle(t.title);
+      if (ids.has(t.id) || titles.has(key) || picked.length + fresh.length >= MAX_SONGS) continue;
+      ids.add(t.id);
+      titles.add(key);
+      fresh.push({ ...t, startSec: 0 });
+    }
+    setPicked((list) => [...list, ...fresh]);
+    setNotice(
+      fresh.length === 0
+        ? `No new songs added from ${from}: they're already in your list, or the list is full.`
+        : `Added ${fresh.length} ${fresh.length === 1 ? "song" : "songs"} from ${from}. Edit the list below as you like.`,
+    );
+  }
 
   const pickedIds = new Set(picked.map((t) => t.id));
   const toggle = (t: HostTrack) => {
@@ -180,6 +210,66 @@ export default function HostPage() {
       </section>
 
       <section className="flex flex-col gap-3">
+        <div role="tablist" aria-label="Add songs" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1">
+          {ADD_TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={addTab === t.id}
+              onClick={() => {
+                setAddTab(t.id);
+                setNotice("");
+              }}
+              className={`rounded-xl px-1 py-2 text-sm font-bold transition ${addTab === t.id ? "bg-lime text-ink" : "text-mute hover:text-white"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {notice && <p className="rounded-xl bg-lime/10 px-4 py-2 text-sm text-lime">{notice}</p>}
+        {addTab !== "search" ? (
+          <SourceFill kind={addTab} onFill={addMany} />
+        ) : (
+          <>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search songs or artists…"
+              className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
+            />
+            {q.length >= 2 &&
+              (results === null ? (
+                <p className="text-mute">Searching…</p>
+              ) : results.length === 0 ? (
+                <p className="text-mute">No songs found.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {results.map((t) => {
+                    const added = pickedIds.has(t.id);
+                    return (
+                      <li key={t.id}>
+                        <button
+                          onClick={() => toggle(t)}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-2 pr-3 text-left transition ${added ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
+                        >
+                          <Cover src={t.cover} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{t.title}</p>
+                            <p className="truncate text-xs text-mute">{t.artist} · {t.album}</p>
+                          </div>
+                          <span className={`text-sm font-bold ${added ? "text-lime" : "text-cyan"}`}>{added ? "Added" : "+ Add"}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ))}
+          </>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium uppercase tracking-widest text-mute">
           Your songs <span className="normal-case tracking-normal">({picked.length}/{MAX_SONGS}, at least {MIN_SONGS})</span>
         </h2>
@@ -238,43 +328,6 @@ export default function HostPage() {
             )}
           </>
         )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search songs or artists…"
-          className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
-        />
-        {q.length >= 2 &&
-          (results === null ? (
-            <p className="text-mute">Searching…</p>
-          ) : results.length === 0 ? (
-            <p className="text-mute">No songs found.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {results.map((t) => {
-                const added = pickedIds.has(t.id);
-                return (
-                  <li key={t.id}>
-                    <button
-                      onClick={() => toggle(t)}
-                      className={`flex w-full items-center gap-3 rounded-xl border p-2 pr-3 text-left transition ${added ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
-                    >
-                      <Cover src={t.cover} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{t.title}</p>
-                        <p className="truncate text-xs text-mute">{t.artist} · {t.album}</p>
-                      </div>
-                      <span className={`text-sm font-bold ${added ? "text-lime" : "text-cyan"}`}>{added ? "Added" : "+ Add"}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ))}
       </section>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-ink/90 px-4 py-4 backdrop-blur">

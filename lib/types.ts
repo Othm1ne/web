@@ -16,6 +16,9 @@ export type PublicOption = { id: string; title: string; cover: string };
 /** A song as shown to event hosts (no preview URL). */
 export type TrackSummary = Omit<Track, "previewUrl">;
 
+/** A song as shown to event hosts, with its preview so they can choose the clip. */
+export type HostTrack = TrackSummary & { previewUrl: string };
+
 export type PublicRound = {
   index: number;
   audioUrl: string;
