@@ -79,6 +79,7 @@ export function useEventAudio(view: EventView | null, serverNow: () => number) {
 
   const phase = view?.phase;
   const startsAt = view?.startsAt ?? null;
+  const clipStart = view?.audio.startSec ?? 0;
   useEffect(() => {
     const el = audio.current;
     if (!el) return;
@@ -97,8 +98,9 @@ export function useEventAudio(view: EventView | null, serverNow: () => number) {
         if (el.getAttribute("src") !== src) el.src = src;
         const begin = () => {
           playing.current = current;
-          // Joining late (or a slow download) starts mid-clip, in step with everyone else.
-          el.currentTime = Math.max(0, (serverNow() - startsAt) / 1000);
+          // From the host's chosen point; joining late (or a slow download) starts further in,
+          // in step with everyone else.
+          el.currentTime = clipStart + Math.max(0, (serverNow() - startsAt) / 1000);
           el.play().catch(() => {
             playing.current = null;
           });
@@ -110,7 +112,7 @@ export function useEventAudio(view: EventView | null, serverNow: () => number) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [phase, current, startsAt, unlocked, load, serverNow]);
+  }, [phase, current, startsAt, clipStart, unlocked, load, serverNow]);
 
   useEffect(() => {
     if (audio.current) audio.current.muted = muted;

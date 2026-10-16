@@ -33,6 +33,7 @@ describe("event engine", () => {
       expect(new Set(r.options.map((o) => o.trackId)).size).toBe(4);
       expect(r.options.some((o) => o.trackId === r.trackId)).toBe(true);
     }
+    expect(rounds.every((r) => r.startSec === 0)).toBe(true);
     expect(() => buildRounds(tracks.slice(0, 3))).toThrow("not_enough_songs");
     expect(() => buildRounds([...tracks, tracks[0]])).toThrow("duplicate_songs");
   });
@@ -64,10 +65,17 @@ describe("event engine", () => {
 
     // buildRounds stores the catalog songs it used so the view can show them.
     const hosted = [answer, ...hostSongs];
-    const built = buildRounds(hosted, new Map([["daft", catalog]]), () => 0.5);
+    const built = buildRounds(hosted, { catalog: new Map([["daft", catalog]]), rnd: () => 0.5 });
     const optionIds = built.rounds[0].options.map((o) => o.trackId);
     expect(optionIds.filter((id) => id.startsWith("c"))).toHaveLength(3);
     expect(optionIds.every((id) => built.tracks.some((t) => t.id === id))).toBe(true);
+  });
+
+  it("keeps the host's chosen clip start for each round", () => {
+    const { rounds } = buildRounds(tracks, { starts: new Map([["t1", 12], ["t3", 20]]) });
+    expect(rounds.map((r) => r.startSec)).toEqual([0, 12, 0, 20, 0]);
+    expect(() => buildRounds(tracks, { starts: new Map([["t0", 21]]) })).toThrow("bad_clip_start");
+    expect(() => buildRounds(tracks, { starts: new Map([["t0", -1]]) })).toThrow("bad_clip_start");
   });
 
   it("derives phases from the clock and answer count", () => {
@@ -120,6 +128,15 @@ describe("event view", () => {
     expect(after.phase).toBe("reveal");
     expect(after.round!.reveal!.correctOptionId).toBe(correctId(e));
     expect(after.you).toMatchObject({ score: 100, rank: 1, answer: { correct: true, points: 100 } });
+  });
+
+  it("tells the playing device where the current clip starts", () => {
+    const e = liveEvent("phones");
+    e.rounds[0].startSec = 15;
+    Object.assign(e, advance(e, "lobby", 0));
+    expect(eventView(e, players, [], "p1", 0).audio).toMatchObject({ current: expect.stringMatching(/rounds\/0\/audio$/), startSec: 15 });
+    delete e.rounds[0].startSec; // events created before clip starts existed
+    expect(eventView(e, players, [], "p1", 0).audio.startSec).toBe(0);
   });
 
   it("gives clips only to the device that plays them", () => {

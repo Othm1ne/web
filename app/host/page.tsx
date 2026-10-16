@@ -1,13 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type User, ensureUser, errorMessage, googleSignInUrl } from "@/lib/client";
-import type { EventMode } from "@/lib/event/types";
+import { type EventMode, MAX_CLIP_START_S } from "@/lib/event/types";
 import type { TrackSummary } from "@/lib/types";
 
 const MIN_SONGS = 4;
 const MAX_SONGS = 30;
+/** Length of a round's answer window, i.e. how much of the clip players hear before time's up. */
+const CLIP_S = 10;
+
+type HostTrack = TrackSummary & { previewUrl: string };
+type Picked = HostTrack & { startSec: number };
+
+const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 
 const MODES: { id: EventMode; title: string; body: string }[] = [
   { id: "screen", title: "Big screen + phones", body: "Your screen plays the music and shows the choices. Players answer on their phones." },
@@ -24,8 +31,11 @@ export default function HostPage() {
   const [user, setUser] = useState<User | null>(null);
   const [mode, setMode] = useState<EventMode>("screen");
   const [query, setQuery] = useState("");
-  const [search, setSearch] = useState<{ q: string; tracks: TrackSummary[] } | null>(null);
-  const [picked, setPicked] = useState<TrackSummary[]>([]);
+  const [search, setSearch] = useState<{ q: string; tracks: HostTrack[] } | null>(null);
+  const [picked, setPicked] = useState<Picked[]>([]);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const player = useRef<HTMLAudioElement | null>(null);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,11 +60,50 @@ export default function HostPage() {
     return () => clearTimeout(timer);
   }, [query, user]);
 
+  useEffect(
+    () => () => {
+      player.current?.pause();
+      clearTimeout(stopTimer.current);
+    },
+    [],
+  );
+
+  function stopClip() {
+    player.current?.pause();
+    clearTimeout(stopTimer.current);
+    setPlaying(null);
+  }
+
+  /** Plays exactly what players will hear: CLIP_S seconds from the chosen start. */
+  function playClip(t: Picked, startSec = t.startSec) {
+    const el = (player.current ??= new Audio());
+    clearTimeout(stopTimer.current);
+    const begin = () => {
+      el.currentTime = startSec;
+      el.play().catch(() => setPlaying(null));
+    };
+    if (el.getAttribute("src") !== t.previewUrl) {
+      el.src = t.previewUrl;
+      el.addEventListener("loadedmetadata", begin, { once: true });
+    } else begin();
+    setPlaying(t.id);
+    stopTimer.current = setTimeout(stopClip, CLIP_S * 1000);
+  }
+
+  const setStart = (id: string, startSec: number) =>
+    setPicked((list) => list.map((x) => (x.id === id ? { ...x, startSec } : x)));
+
   const pickedIds = new Set(picked.map((t) => t.id));
-  const toggle = (t: TrackSummary) =>
+  const toggle = (t: HostTrack) => {
+    if (playing === t.id) stopClip();
     setPicked((list) =>
-      list.some((x) => x.id === t.id) ? list.filter((x) => x.id !== t.id) : list.length < MAX_SONGS ? [...list, t] : list,
+      list.some((x) => x.id === t.id)
+        ? list.filter((x) => x.id !== t.id)
+        : list.length < MAX_SONGS
+          ? [...list, { ...t, startSec: 0 }]
+          : list,
     );
+  };
   const move = (i: number, by: number) =>
     setPicked((list) => {
       const out = [...list];
@@ -74,13 +123,14 @@ export default function HostPage() {
     });
 
   async function create() {
+    stopClip();
     setCreating(true);
     setError("");
     try {
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, trackIds: picked.map((t) => t.id) }),
+        body: JSON.stringify({ mode, songs: picked.map((t) => ({ id: t.id, startSec: t.startSec })) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(errorMessage(data.error));
@@ -134,22 +184,51 @@ export default function HostPage() {
         </h2>
         {picked.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-5 text-center text-sm text-mute">
-            Search below and add songs. Each song is one round, and the wrong choices come from your other songs.
+            Search below and add songs. Each song is one round: you choose which 10 seconds players hear.
           </p>
         ) : (
           <>
             <ol className="flex flex-col gap-2">
               {picked.map((t, i) => (
-                <li key={t.id} className="flex items-center gap-3 rounded-xl bg-panel p-2 pr-3">
-                  <span className="w-6 text-center font-display font-bold text-cyan">{i + 1}</span>
-                  <Cover src={t.cover} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{t.title}</p>
-                    <p className="truncate text-xs text-mute">{t.artist}</p>
+                <li key={t.id} className="flex flex-col gap-2 rounded-xl bg-panel p-2 pr-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 text-center font-display font-bold text-cyan">{i + 1}</span>
+                    <Cover src={t.cover} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{t.title}</p>
+                      <p className="truncate text-xs text-mute">{t.artist}</p>
+                    </div>
+                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↑</button>
+                    <button onClick={() => move(i, 1)} disabled={i === picked.length - 1} aria-label="Move down" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↓</button>
+                    <button onClick={() => toggle(t)} aria-label="Remove" className="rounded-lg px-2 py-1 text-coral">✕</button>
                   </div>
-                  <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↑</button>
-                  <button onClick={() => move(i, 1)} disabled={i === picked.length - 1} aria-label="Move down" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↓</button>
-                  <button onClick={() => toggle(t)} aria-label="Remove" className="rounded-lg px-2 py-1 text-coral">✕</button>
+                  <div className="flex items-center gap-3 pl-1 sm:pl-9">
+                    <button
+                      onClick={() => (playing === t.id ? stopClip() : playClip(t))}
+                      aria-label={playing === t.id ? `Stop ${t.title}` : `Play the part players will hear of ${t.title}`}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm transition ${
+                        playing === t.id ? "bg-lime text-ink" : "bg-panel-2 text-cyan hover:text-white"
+                      }`}
+                    >
+                      {playing === t.id ? "■" : "▶"}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={MAX_CLIP_START_S}
+                      step={1}
+                      value={t.startSec}
+                      onChange={(e) => setStart(t.id, Number(e.target.value))}
+                      // Replay from the new point once the host lets go, if this song was playing.
+                      onPointerUp={(e) => playing === t.id && playClip(t, Number(e.currentTarget.value))}
+                      onKeyUp={(e) => playing === t.id && playClip(t, Number(e.currentTarget.value))}
+                      aria-label={`Where ${t.title} starts`}
+                      className="min-w-0 flex-1 accent-lime"
+                    />
+                    <span className="w-20 shrink-0 text-right text-xs tabular-nums text-mute">
+                      {clock(t.startSec)}–{clock(t.startSec + CLIP_S)}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ol>

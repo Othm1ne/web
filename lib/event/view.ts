@@ -78,7 +78,10 @@ export function eventView(
     roundMs: ROUND_MS,
     playerCount: players.length,
     standings,
-    audio: phase === "finished" ? { current: null, next: null } : { current: audio(index), next: audio(index + 1) },
+    audio:
+      phase === "finished"
+        ? { current: null, next: null, startSec: 0 }
+        : { current: audio(index), next: audio(index + 1), startSec: r?.startSec ?? 0 },
     round,
     you:
       role === "player" && me

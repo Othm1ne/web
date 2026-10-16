@@ -7,12 +7,16 @@ import { requireHost } from "@/lib/event/service";
 import { GameError } from "@/lib/game/engine";
 import { route } from "@/lib/http";
 import { music } from "@/lib/music/provider";
+import { MAX_CLIP_START_S } from "@/lib/event/types";
 import type { Track } from "@/lib/types";
 import { requireUser } from "@/lib/session";
 
 const Body = z.object({
   mode: z.enum(["screen", "phones"]),
-  trackIds: z.array(z.string().regex(/^\d{1,15}$/)).min(MIN_SONGS).max(MAX_SONGS),
+  songs: z
+    .array(z.object({ id: z.string().regex(/^\d{1,15}$/), startSec: z.number().min(0).max(MAX_CLIP_START_S).default(0) }))
+    .min(MIN_SONGS)
+    .max(MAX_SONGS),
 });
 
 const CATALOG_CONCURRENCY = 4;
@@ -40,10 +44,11 @@ async function artistCatalogs(tracks: Track[]): Promise<Map<string, Track[]>> {
 export const POST = route(async (req: Request) => {
   const user = await requireUser();
   requireHost(user);
-  const { mode, trackIds } = Body.parse(await req.json());
-  const tracks = await music.tracksByIds(trackIds);
-  if (tracks.length !== trackIds.length) throw new GameError("songs_unavailable", 422);
-  const built = buildRounds(tracks, await artistCatalogs(tracks));
+  const { mode, songs } = Body.parse(await req.json());
+  const tracks = await music.tracksByIds(songs.map((s) => s.id));
+  if (tracks.length !== songs.length) throw new GameError("songs_unavailable", 422);
+  const starts = new Map(songs.map((s) => [s.id, s.startSec]));
+  const built = buildRounds(tracks, { catalog: await artistCatalogs(tracks), starts });
   const event = {
     id: randomUUID(),
     hostId: user.id,

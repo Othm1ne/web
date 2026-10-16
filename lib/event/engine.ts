@@ -7,7 +7,7 @@ import { normalizeTitle, similarity } from "../game/match";
 import { GRACE_MS, OPTIONS_PER_ROUND, ROUND_MS, pointsFor } from "../game/scoring";
 import type { Track } from "../types";
 
-import type { EventMode, EventPhase } from "./types";
+import { type EventMode, type EventPhase, MAX_CLIP_START_S } from "./types";
 
 export type { EventMode, EventPhase };
 
@@ -20,7 +20,8 @@ const EARLY_TOLERANCE_MS = 300;
 /** Events stop accepting players after this long. */
 export const EVENT_TTL_MS = 12 * 60 * 60 * 1000;
 
-export type EventRound = { trackId: string; options: { id: string; trackId: string }[] };
+/** startSec: where in the preview the round starts (set by the host; absent on older events). */
+export type EventRound = { trackId: string; startSec?: number; options: { id: string; trackId: string }[] };
 
 export type LiveEvent = {
   id: string;
@@ -98,12 +99,16 @@ export function pickDistractors(answer: Track, sameArtist: Track[], others: Trac
 
 /**
  * One round per host song, in the host's order. `catalog` maps an artist id to that artist's
- * songs (fetched by the caller; may be missing). Returns the rounds and every track they use.
+ * songs (fetched by the caller; may be missing); `starts` maps a song id to where its clip
+ * starts. Returns the rounds and every track they use.
  */
 export function buildRounds(
   tracks: Track[],
-  catalog: Map<string, Track[]> = new Map(),
-  rnd: () => number = Math.random,
+  { catalog = new Map(), starts = new Map(), rnd = Math.random }: {
+    catalog?: Map<string, Track[]>;
+    starts?: Map<string, number>;
+    rnd?: () => number;
+  } = {},
 ): { rounds: EventRound[]; tracks: Track[] } {
   if (tracks.length < MIN_SONGS) throw new GameError("not_enough_songs", 422);
   if (tracks.length > MAX_SONGS) throw new GameError("too_many_songs", 422);
@@ -119,8 +124,11 @@ export function buildRounds(
       : [];
     const wrong = pickDistractors(answer, sameArtist, hostOthers, rnd);
     for (const t of wrong) used.set(t.id, t);
+    const start = starts.get(answer.id) ?? 0;
+    if (!Number.isFinite(start) || start < 0 || start > MAX_CLIP_START_S) throw new GameError("bad_clip_start");
     return {
       trackId: answer.id,
+      startSec: start,
       options: shuffle([answer, ...wrong], rnd).map((t) => ({ id: randomBytes(6).toString("hex"), trackId: t.id })),
     };
   });

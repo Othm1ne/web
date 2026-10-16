@@ -4,6 +4,12 @@ import type { PublicOption, RevealTrack } from "../types";
 /** Supabase Realtime channel that pings every screen of an event. */
 export const eventTopic = (code: string) => `earrush-event-${code}`;
 
+/**
+ * iTunes previews are about 30 s long; the host can start a round anywhere up to this point,
+ * which always leaves room for the 10 s answer window.
+ */
+export const MAX_CLIP_START_S = 20;
+
 export type EventMode = "screen" | "phones";
 export type EventPhase = "lobby" | "countdown" | "question" | "reveal" | "finished";
 
@@ -24,8 +30,8 @@ export type EventView = {
   roundMs: number;
   playerCount: number;
   standings: StandingRow[];
-  /** Clip URLs for this viewer, if their device plays the music (next = preload). */
-  audio: { current: string | null; next: string | null };
+  /** Clip URLs for this viewer, if their device plays the music (next = preload), and where in the clip the current round starts. */
+  audio: { current: string | null; next: string | null; startSec: number };
   round: null | {
     options: PublicOption[];
     answered: number;
