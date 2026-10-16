@@ -6,6 +6,7 @@ import { normalizeTitle } from "../game/match";
 import type { ArtistSummary, Track } from "../types";
 import { dbCacheStore } from "../db/cacheStore";
 import { type Cache, createCache, fileStore } from "./cache";
+import { parseChartFeed } from "./chart";
 import type { MusicProvider } from "./provider";
 
 const COUNTRY = process.env.MUSIC_COUNTRY ?? "US";
@@ -137,6 +138,15 @@ export const itunesProvider: MusicProvider = {
         .slice(0, 20);
     });
   },
+
+  genreTracks: (genre) =>
+    cached(`genre:${genre.itunesId}`, DAY, async () => {
+      const url = `https://itunes.apple.com/${COUNTRY.toLowerCase()}/rss/topsongs/limit=100/genre=${genre.itunesId}/json`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 403 || res.status === 429) throw new GameError("music_rate_limited", 503);
+      if (!res.ok) throw new GameError("music_unavailable", 502);
+      return parseChartFeed(await res.json());
+    }),
 
   // Not cached: called once per event, and the preview URLs must be current.
   tracksByIds: async (ids) => {
