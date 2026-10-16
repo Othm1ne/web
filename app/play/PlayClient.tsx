@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
 import { GENRES, type Genre, genreSourceId } from "@/lib/music/genres";
+import { useNavigationBusy } from "@/lib/useNavigationBusy";
 import type { ArtistSummary } from "@/lib/types";
 
 type Tab = "artist" | "genre";
@@ -62,7 +63,7 @@ export function PlayClient() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<{ q: string; artists: ArtistSummary[] } | null>(null);
   const [selected, setSelected] = useState<ArtistSummary | null>(linkedGenre ? genreSource(linkedGenre) : null);
-  const [starting, setStarting] = useState(false);
+  const [starting, setStarting] = useNavigationBusy();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 

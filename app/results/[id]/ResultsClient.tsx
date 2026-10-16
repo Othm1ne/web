@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createGame, errorMessage } from "@/lib/client";
 import type { GameSummary } from "@/lib/types";
+import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
 function useCountUp(target: number, ms = 900) {
   const [value, setValue] = useState(0);
@@ -36,7 +37,7 @@ export function ResultsClient() {
   const router = useRouter();
   const [summary, setSummary] = useState<GameSummary | null>(null);
   const [error, setError] = useState("");
-  const [restarting, setRestarting] = useState(false);
+  const [restarting, setRestarting] = useNavigationBusy();
   const score = useCountUp(summary?.score ?? 0);
 
   useEffect(() => {

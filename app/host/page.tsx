@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { type User, ensureUser, errorMessage, googleSignInUrl } from "@/lib/client";
 import { type EventMode, MAX_CLIP_START_S } from "@/lib/event/types";
 import type { TrackSummary } from "@/lib/types";
+import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
 const MIN_SONGS = 4;
 const MAX_SONGS = 30;
@@ -36,7 +37,7 @@ export default function HostPage() {
   const [playing, setPlaying] = useState<string | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useNavigationBusy();
   const [error, setError] = useState("");
 
   useEffect(() => {

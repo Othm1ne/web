@@ -14,6 +14,19 @@ function config() {
 
 export const googleEnabled = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
+/**
+ * Where sign-in must run. With APP_URL set, a request arriving on any other address (Vercel
+ * gives a project several) is sent there first, so only one redirect URI needs registering
+ * with Google and the state cookie and callback share an origin. Null means "stay here".
+ */
+export function canonicalSignInUrl(requestUrl: string, appUrl = process.env.APP_URL): string | null {
+  if (!appUrl) return null;
+  const here = new URL(requestUrl);
+  const home = new URL(appUrl);
+  if (here.origin === home.origin) return null;
+  return new URL(here.pathname + here.search, home.origin).toString();
+}
+
 /** Must match an "Authorized redirect URI" in the Google Cloud console exactly. */
 export const redirectUri = (origin: string) => `${process.env.APP_URL ?? origin}/api/auth/google/callback`;
 

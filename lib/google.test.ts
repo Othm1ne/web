@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIdToken, safeReturnTo } from "./google";
+import { canonicalSignInUrl, parseIdToken, safeReturnTo } from "./google";
 
 const token = (claims: object) => `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.sig`;
 const valid = { iss: "https://accounts.google.com", aud: "client", sub: "123", exp: 2000, email: "a@b.c", email_verified: true };
@@ -15,6 +15,13 @@ describe("google", () => {
     expect(() => parseIdToken(token({ ...valid, iss: "evil" }), "client", 1_000_000)).toThrow("google_bad_token");
     expect(() => parseIdToken(token(valid), "client", 3_000_000)).toThrow("google_bad_token");
     expect(() => parseIdToken("nope", "client")).toThrow("google_bad_token");
+  });
+
+  it("moves sign-in to the canonical address when APP_URL is set", () => {
+    const start = "https://web-othm1ne.vercel.app/api/auth/google?returnTo=%2Fhost";
+    expect(canonicalSignInUrl(start, "https://earush.app")).toBe("https://earush.app/api/auth/google?returnTo=%2Fhost");
+    expect(canonicalSignInUrl("https://earush.app/api/auth/google", "https://earush.app/")).toBeNull();
+    expect(canonicalSignInUrl(start, undefined)).toBeNull();
   });
 
   it("only returns to same-site paths", () => {
