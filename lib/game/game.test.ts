@@ -72,6 +72,24 @@ describe("engine", () => {
     expect(answerRound(game, 1, null, 25_000)).toMatchObject({ correct: false, points: 0 });
   });
 
+  it("gives the floor for a right answer in the network grace window, and 0 after it", () => {
+    const game = createGame(me, artist, pool);
+    const rightId = (i: number) => game.rounds[i].options.find((o) => o.trackId === game.rounds[i].trackId)!.id;
+    startRound(game, 0, 0);
+    expect(answerRound(game, 0, rightId(0), ROUND_MS + 1000)).toMatchObject({ correct: true, points: 55, elapsedMs: ROUND_MS });
+    startRound(game, 1, 0);
+    expect(answerRound(game, 1, rightId(1), ROUND_MS + 2000)).toMatchObject({ correct: false, points: 0 });
+  });
+
+  it("keeps each clip's key secret until its round starts, and the clock with it", () => {
+    const game = createGame(me, artist, pool);
+    expect(JSON.stringify(toPublicGame(game))).not.toContain(game.rounds[0].clipKey!);
+    expect(new Set(game.rounds.map((r) => r.clipKey)).size).toBe(10);
+    expect(startRound(game, 0, 1000)).toEqual({ startedAt: 1000, roundMs: ROUND_MS, clipKey: game.rounds[0].clipKey });
+    // Asking again (a reload) gives the same clock, not a fresh one.
+    expect(startRound(game, 0, 5000).startedAt).toBe(1000);
+  });
+
   it("refuses a too-small pool", () => {
     expect(() => createGame(me, artist, pool.slice(0, 5))).toThrow("not_enough_tracks");
   });

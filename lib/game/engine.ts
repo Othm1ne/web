@@ -13,6 +13,8 @@ type Answer = { optionId: string | null; elapsedMs: number; correct: boolean; po
 export type Round = {
   trackId: string;
   options: { id: string; trackId: string }[];
+  /** Key the clip is encrypted with (see clip.ts), released by startRound. Older games have none. */
+  clipKey?: string;
   startedAt?: number;
   answer?: Answer;
 };
@@ -57,6 +59,7 @@ export function createGame(
       trackId: answer.id,
       // Option IDs are opaque so the client cannot tell which one is correct.
       options: choices.map((t) => ({ id: randomBytes(6).toString("hex"), trackId: t.id })),
+      clipKey: randomBytes(32).toString("base64url"),
     };
   });
   return { id: randomUUID(), player, artist, tracks, rounds, createdAt: now };
@@ -71,11 +74,14 @@ function roundAt(game: Game, index: number): Round {
   return game.rounds[index];
 }
 
-/** Starts the round clock. Idempotent, so reloading the page does not reset the timer. */
+/**
+ * Starts the round clock and hands over the key to the round's clip, so the clip can't be heard
+ * before its clock runs. Idempotent, so reloading the page does not reset the timer.
+ */
 export function startRound(game: Game, index: number, now = Date.now()) {
   const round = roundAt(game, index);
   round.startedAt ??= now;
-  return { startedAt: round.startedAt, roundMs: ROUND_MS };
+  return { startedAt: round.startedAt, roundMs: ROUND_MS, clipKey: round.clipKey ?? null };
 }
 
 const revealTrack = ({ title, artist, album, cover }: Track): RevealTrack => ({ title, artist, album, cover });

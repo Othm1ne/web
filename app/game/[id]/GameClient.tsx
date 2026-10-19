@@ -5,18 +5,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Equalizer } from "@/components/Logo";
 import { TimerRing } from "@/components/TimerRing";
 import { errorMessage } from "@/lib/client";
+import { decryptClip } from "@/lib/game/clip";
 import type { PublicGame, RevealResult } from "@/lib/types";
 
 type Phase = "loading" | "ready" | "countdown" | "buffering" | "playing" | "reveal" | "error";
 const REVEAL_MS = 4000;
 const CLIP_CONCURRENCY = 2;
 
+/** A downloaded clip; sealed ones need the key the round's start hands over. */
+type Clip = { data: ArrayBuffer; type: string; sealed: boolean };
+
 /**
  * Downloads clips in round order, a few at a time, so the first rounds are ready quickly and
- * the rest arrive while the player is busy. Returns one promise per clip (an object URL).
+ * the rest arrive while the player is busy. Returns one promise per clip.
  */
-function loadClips(urls: string[], signal: AbortSignal, onLoaded: (index: number, url: string) => void): Promise<string>[] {
-  const slots = urls.map(() => Promise.withResolvers<string>());
+function loadClips(urls: string[], signal: AbortSignal, onLoaded: (index: number) => void): Promise<Clip>[] {
+  const slots = urls.map(() => Promise.withResolvers<Clip>());
   slots.forEach((s) => s.promise.catch(() => {}));
   let next = 0;
   const worker = async () => {
@@ -25,9 +29,10 @@ function loadClips(urls: string[], signal: AbortSignal, onLoaded: (index: number
       try {
         const res = await fetch(urls[i], { signal });
         if (!res.ok) throw new Error("clip failed");
-        const url = URL.createObjectURL(await res.blob());
-        onLoaded(i, url);
-        slots[i].resolve(url);
+        const sealedType = res.headers.get("x-clip-type");
+        const clip = { data: await res.arrayBuffer(), type: sealedType ?? res.headers.get("content-type") ?? "audio/mp4", sealed: sealedType !== null };
+        onLoaded(i);
+        slots[i].resolve(clip);
       } catch (e) {
         slots[i].reject(e);
       }
@@ -63,7 +68,8 @@ export function GameClient() {
   const [muted, setMuted] = useState(false);
 
   const audio = useRef<HTMLAudioElement | null>(null);
-  const clips = useRef<Promise<string>[]>([]);
+  const clips = useRef<Promise<Clip>[]>([]);
+  const objectUrl = useRef<string | null>(null);
   const clipReady = useRef(new Set<number>());
   const timer = useRef<number | null>(null);
   const answering = useRef(false);
@@ -77,7 +83,6 @@ export function GameClient() {
   useEffect(() => {
     let cancelled = false;
     const abort = new AbortController();
-    const objectUrls: string[] = [];
     (async () => {
       const res = await fetch(`/api/games/${id}`);
       const data = await res.json();
@@ -89,10 +94,7 @@ export function GameClient() {
       clips.current = loadClips(
         g.rounds.map((r) => r.audioUrl),
         abort.signal,
-        (i, url) => {
-          objectUrls.push(url);
-          clipReady.current.add(i);
-        },
+        (i) => clipReady.current.add(i),
       );
       await clips.current[0];
       if (!cancelled) setPhase("ready");
@@ -100,13 +102,13 @@ export function GameClient() {
     return () => {
       cancelled = true;
       abort.abort();
-      objectUrls.forEach((u) => URL.revokeObjectURL(u));
     };
   }, [id, router]);
 
   useEffect(() => () => {
     if (timer.current) clearInterval(timer.current);
     audio.current?.pause();
+    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
   }, []);
 
   const stopTimer = () => {
@@ -139,25 +141,30 @@ export function GameClient() {
       setPicked(null);
       setReveal(null);
       // Normally already downloaded during earlier rounds; on a slow connection, wait for it.
-      let src: string;
+      let clip: Clip;
       if (!clipReady.current.has(i)) setPhase("buffering");
       try {
-        src = await clips.current[i];
+        clip = await clips.current[i];
       } catch {
         return fail(new Error("A clip failed to load. Check your connection and start a new game."));
       }
       setRemaining(game.roundMs);
       setPhase("playing");
       answering.current = false;
-      const el = audio.current!;
-      el.src = src;
-      el.currentTime = 0;
-      await el.play().catch(() => {});
+      // Starting the round's clock is what unlocks its clip, so the clip plays right after.
+      let data = clip.data;
       try {
-        await post(`/api/games/${id}/rounds/${i}/start`);
+        const { clipKey } = await post<{ clipKey: string | null }>(`/api/games/${id}/rounds/${i}/start`);
+        if (clip.sealed) data = await decryptClip(clip.data, clipKey ?? "");
       } catch (e) {
         return fail(e);
       }
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = URL.createObjectURL(new Blob([data], { type: clip.type }));
+      const el = audio.current!;
+      el.src = objectUrl.current;
+      el.currentTime = 0;
+      await el.play().catch(() => {});
       const startedAt = performance.now();
       timer.current = window.setInterval(() => {
         const left = game.roundMs - (performance.now() - startedAt);

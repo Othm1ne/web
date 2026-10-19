@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
-import { GENRES, type Genre, genreSourceId } from "@/lib/music/genres";
+import { GenreSearch } from "@/components/GenreSearch";
+import { GENRES, type Genre, genreFromSource, genreSourceId } from "@/lib/music/genres";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 import type { ArtistSummary } from "@/lib/types";
 
@@ -53,7 +54,7 @@ export function PlayClient() {
   const router = useRouter();
   const params = useSearchParams();
   // /play?genre=pop (from the home screen) opens the genre tab with that genre picked.
-  const linkedGenre = GENRES.find((g) => g.slug === params.get("genre"));
+  const linkedGenre = genreFromSource(genreSourceId(params.get("genre") ?? ""));
   const [tab, setTab] = useState<Tab>(linkedGenre || params.get("tab") === "genre" ? "genre" : "artist");
   const [user, setUser] = useState<User | null>(null);
   const [google, setGoogle] = useState(false);
@@ -196,6 +197,7 @@ export function PlayClient() {
       {tab === "genre" ? (
         <section className="flex flex-col gap-3">
           <p className="text-sm text-mute">Current hits from the genre&apos;s chart, from lots of different artists.</p>
+          <GenreSearch onPick={(g) => select(genreSource(g))} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {GENRES.map((g) => (
               <GenreTile key={g.slug} genre={g} selected={selected?.id === genreSourceId(g.slug)} onSelect={() => select(genreSource(g))} />

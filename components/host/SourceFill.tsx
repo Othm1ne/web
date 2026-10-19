@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { GenreSearch } from "@/components/GenreSearch";
 import { errorMessage } from "@/lib/client";
 import { GENRES, genreSourceId } from "@/lib/music/genres";
 import type { ArtistSummary, HostTrack } from "@/lib/types";
@@ -113,6 +114,8 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
           )}
         </>
       ) : (
+        <>
+        <GenreSearch onPick={(g) => fill(genreSourceId(g.slug), g.name)} disabled={loading !== null} />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {GENRES.map((g) => (
             <button
@@ -125,6 +128,7 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
             </button>
           ))}
         </div>
+        </>
       )}
       {error && <p className="text-sm text-coral">{error}</p>}
     </div>

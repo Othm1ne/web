@@ -8,7 +8,7 @@ import { GENRES } from "@/lib/music/genres";
 
 const MODES = [
   { href: "/play", icon: "🎤", title: "By artist", body: "Pick your favorite artist and prove you know every song." },
-  { href: "/play?tab=genre", icon: "🎧", title: "By genre", body: "Pop, rap, K-Pop, rock… current hits from many artists." },
+  { href: "/play?tab=genre", icon: "🎧", title: "By genre", body: "Pop, rap, afrobeats, anime… or type any genre. Current hits from many artists." },
   { href: "/host", icon: "📺", title: "Live event", body: "Pick the songs, share a code, play together on a big screen or phones." },
 ];
 
@@ -126,7 +126,7 @@ export default function Landing() {
           </Link>
         </div>
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2">
-          {GENRES.map((g) => (
+          {GENRES.slice(0, 16).map((g) => (
             <Link
               key={g.slug}
               href={`/play?genre=${g.slug}`}
