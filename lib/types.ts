@@ -66,5 +66,7 @@ export type GameSummary = {
   top: LeaderboardRow[];
   /** Why the game is kept off the leaderboard (see lib/game/integrity.ts), or null if it counts. */
   unranked: "too_fast" | null;
+  /** The player's best ranked score on this artist or genre before this game (null on a first try). */
+  previousBest: number | null;
   rounds: (RevealTrack & { correct: boolean; points: number; elapsedMs: number })[];
 };

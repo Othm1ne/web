@@ -42,7 +42,7 @@ export function PlayerClient() {
     return (
       <div className="m-auto flex flex-col items-center gap-4 text-center">
         <p className="text-lg">{d.player.youHost}</p>
-        <Link href={`/host/${view.code}`} className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
+        <Link href={`/host/${view.code}`} className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
           {d.player.openHost}
         </Link>
       </div>
@@ -76,7 +76,7 @@ export function PlayerClient() {
             className="rounded-xl border border-line bg-panel px-4 py-3 text-base text-white outline-none focus:border-cyan"
           />
         </label>
-        <button disabled={busy} className="rounded-2xl bg-lime py-4 font-display text-lg font-bold text-ink disabled:opacity-60">
+        <button disabled={busy} className="btn-press rounded-2xl bg-lime py-4 font-display text-lg font-bold text-ink disabled:opacity-60">
           {busy ? d.player.joining : d.player.join}
         </button>
         {actionError && <p className="text-center text-sm text-coral">{actionError}</p>}
@@ -191,7 +191,7 @@ export function PlayerClient() {
             </p>
           </div>
           <Standings rows={view.standings} />
-          <Link href="/play" className="rounded-2xl bg-lime py-4 text-center font-display font-bold text-ink">
+          <Link href="/play" className="btn-press rounded-2xl bg-lime py-4 text-center font-display font-bold text-ink">
             {d.common.playSolo}
           </Link>
         </div>

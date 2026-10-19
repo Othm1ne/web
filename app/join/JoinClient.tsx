@@ -35,7 +35,7 @@ export function JoinClient() {
         dir="ltr"
         className="rounded-2xl border-2 border-line bg-panel px-4 py-4 text-center font-display text-4xl font-bold tracking-[0.3em] text-white uppercase outline-none placeholder:text-line focus:border-cyan"
       />
-      <button disabled={code.length !== 6} className="rounded-2xl bg-lime py-4 font-display text-lg font-bold text-ink disabled:opacity-50">
+      <button disabled={code.length !== 6} className="btn-press rounded-2xl bg-lime py-4 font-display text-lg font-bold text-ink disabled:opacity-50">
         {d.join.continue}
       </button>
       <p className="text-sm text-mute">

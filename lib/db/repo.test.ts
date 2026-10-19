@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { answerRound, createGame, startRound } from "../game/engine";
+import { dayNumber } from "../game/progress";
 import type { Track, User } from "../types";
 import { type Db, migrate, pglite } from "./index";
-import { bestEntries, playedArtists, recordResult, saveUser, signInGoogle } from "./repo";
+import { bestEntries, playedArtists, playerTotals, previousBest, recordResult, saveUser, signInGoogle } from "./repo";
 
 const DAY = 86_400_000;
 const pool: Track[] = Array.from({ length: 12 }, (_, i) => ({
@@ -53,6 +54,29 @@ describe("repo", () => {
     await recordResult(db, play(human, "1", 6, Date.now()));
     await recordResult(db, play(bot, "1", 10, Date.now(), 50));
     expect((await bestEntries(db, { artistId: "1" })).map((e) => e.handle)).toEqual([human.handle]);
+  });
+
+  it("totals a player's ranked points, best score, play days and previous best", async () => {
+    const now = 100 * DAY + 3_600_000;
+    const a = guest(uid(1));
+    const first = play(a, "1", 3, now - DAY);
+    const second = play(a, "1", 6, now);
+    const bot = play(a, "2", 10, now, 50);
+    for (const g of [first, second, bot]) await recordResult(db, g);
+    expect(await playerTotals(db, a.id, "UTC", now)).toEqual({ xp: 900, best: 600, days: expect.arrayContaining([99, 100]) });
+    expect(await previousBest(db, a.id, "1", second.id)).toBe(300);
+    expect(await previousBest(db, a.id, "1", first.id)).toBe(600);
+    expect(await previousBest(db, a.id, "3", first.id)).toBeNull();
+  });
+
+  it("groups play days by the player's local date", async () => {
+    const a = guest(uid(1));
+    // 23:30 UTC on 19 Oct: still the 19th in New York, already the 20th in Paris.
+    const late = Date.parse("2026-10-19T23:30:00Z");
+    await recordResult(db, play(a, "1", 5, late));
+    const days = async (tz: string) => (await playerTotals(db, a.id, tz, late)).days;
+    expect(await days("Europe/Paris")).toEqual([dayNumber("2026-10-20")]);
+    expect(await days("America/New_York")).toEqual([dayNumber("2026-10-19")]);
   });
 
   it("records a game once, even for a session without a user row", async () => {

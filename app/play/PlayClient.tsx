@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
 import { GenreSearch } from "@/components/GenreSearch";
+import { ProgressCard } from "@/components/PlayerProgress";
 import { activeDict } from "@/lib/i18n/active";
 import { useI18n } from "@/lib/i18n/client";
 import { GENRES, type Genre, genreFromSource, genreSourceId } from "@/lib/music/genres";
@@ -145,11 +146,13 @@ export function PlayClient() {
   const isGenre = selected?.id.startsWith("genre-") ?? false;
 
   return (
-    <div className="flex flex-col gap-6 pb-28">
+    <div className="flex flex-col gap-6 pb-44 sm:pb-28">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-3xl font-bold">{d.play.title}</h1>
         <p className="text-mute">{d.play.intro}</p>
       </div>
+
+      <ProgressCard />
 
       <label className="flex flex-col gap-1 text-sm text-mute">
         {d.common.nickname}
@@ -237,7 +240,7 @@ export function PlayClient() {
       )}
 
       {selected && (
-        <div className="fixed inset-x-0 bottom-0 border-t border-line bg-ink/90 px-4 py-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-ink/90 px-4 py-3 backdrop-blur-lg sm:bottom-0 sm:py-4">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-widest text-mute">{isGenre ? d.play.genre : d.play.artist}</p>
@@ -247,7 +250,7 @@ export function PlayClient() {
             <button
               onClick={start}
               disabled={starting || !user}
-              className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink transition hover:scale-[1.03] disabled:opacity-60"
+              className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink disabled:opacity-60"
             >
               {starting ? d.play.building : d.play.start}
             </button>

@@ -39,11 +39,22 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
+const MEDALS = [
+  { medal: "🥇", tone: "border-amber/60 from-amber/20" },
+  { medal: "🥈", tone: "border-slate-300/40 from-slate-300/15" },
+  { medal: "🥉", tone: "border-orange-400/50 from-orange-500/15" },
+];
+
 function Row({ row }: { row: LeaderboardRow }) {
   const { d } = useI18n();
+  const podium = MEDALS[row.rank - 1];
   return (
-    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${row.isYou ? "border border-lime bg-lime/10" : "bg-panel"}`}>
-      <span className="w-10 font-display font-bold text-cyan">#{row.rank}</span>
+    <div
+      className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+        row.isYou ? "border-2 border-lime bg-lime/10" : podium ? `border-2 bg-gradient-to-r to-panel ${podium.tone}` : "bg-panel"
+      }`}
+    >
+      <span className={`w-10 font-display font-bold ${podium ? "text-2xl" : "text-cyan"}`}>{podium ? podium.medal : `#${row.rank}`}</span>
       <span className="w-6 text-center" aria-label={row.country ?? undefined}>{flag(row.country)}</span>
       <span className="flex-1 truncate">{row.handle}{row.isYou && d.common.you}</span>
       <span className="font-display font-bold">{row.score}</span>
@@ -124,7 +135,7 @@ export function LeaderboardClient() {
           {data.top.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-panel p-8 text-center">
               <p>{d.leaderboard.empty}</p>
-              <Link href="/play" className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
+              <Link href="/play" className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
                 {d.leaderboard.beFirst}
               </Link>
             </div>

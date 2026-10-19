@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OPTION_TONES } from "@/components/EventUI";
 import { JoinBox } from "@/components/home/JoinBox";
 import { PopularArtists } from "@/components/home/PopularArtists";
+import { ProgressCard } from "@/components/PlayerProgress";
 import { Equalizer } from "@/components/Logo";
 import { TimerRing } from "@/components/TimerRing";
 import type { Dict } from "@/lib/i18n/dictionaries/en";
@@ -46,9 +47,9 @@ export default async function Landing() {
   const { d } = await getI18n();
   const h = d.home;
   const modes = [
-    { href: "/play", icon: "🎤", title: h.modeArtist, body: h.modeArtistBody },
-    { href: "/play?tab=genre", icon: "🎧", title: h.modeGenre, body: h.modeGenreBody },
-    { href: "/host", icon: "📺", title: h.modeLive, body: h.modeLiveBody },
+    { href: "/play", icon: "🎤", title: h.modeArtist, body: h.modeArtistBody, tone: "from-lime/25 hover:border-lime" },
+    { href: "/play?tab=genre", icon: "🎧", title: h.modeGenre, body: h.modeGenreBody, tone: "from-cyan/25 hover:border-cyan" },
+    { href: "/host", icon: "📺", title: h.modeLive, body: h.modeLiveBody, tone: "from-pink/25 hover:border-pink" },
   ];
   const steps = [
     { title: h.step1, body: h.step1Body },
@@ -71,7 +72,7 @@ export default async function Landing() {
           <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
             {h.hero1}
             <br />
-            <span className="bg-gradient-to-r from-lime to-cyan bg-clip-text text-transparent">{h.hero2}</span>
+            <span className="text-gradient">{h.hero2}</span>
             <br />
             {h.hero3}
           </h1>
@@ -79,13 +80,13 @@ export default async function Landing() {
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <Link
               href="/play"
-              className="rounded-2xl bg-lime px-7 py-4 text-center font-display text-lg font-bold text-ink shadow-[0_0_40px_-8px_var(--color-lime)] transition hover:scale-[1.03]"
+              className="btn-press rounded-2xl bg-lime px-8 py-4 text-center font-display text-xl font-bold text-ink"
             >
               {d.common.playSolo}
             </Link>
             <Link
               href="/host"
-              className="rounded-2xl border-2 border-line px-7 py-4 text-center font-display text-lg font-bold transition hover:border-cyan"
+              className="btn-press rounded-2xl border-2 border-violet bg-violet/20 px-7 py-4 text-center font-display text-lg font-bold [--press:#4c2a99]"
             >
               {h.host}
             </Link>
@@ -95,6 +96,8 @@ export default async function Landing() {
         <MockRound d={d} />
       </section>
 
+      <ProgressCard />
+
       <section className="flex flex-col gap-4">
         <h2 className="font-display text-2xl font-bold">{h.waysToPlay}</h2>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -102,9 +105,9 @@ export default async function Landing() {
             <Link
               key={m.href}
               href={m.href}
-              className="group flex flex-col gap-2 rounded-2xl border border-line bg-panel p-5 transition hover:-translate-y-0.5 hover:border-lime"
+              className={`group flex flex-col gap-2 rounded-3xl border-2 border-line bg-gradient-to-br to-panel p-5 transition hover:-translate-y-1 ${m.tone}`}
             >
-              <span className="text-3xl" aria-hidden>
+              <span className="text-4xl transition group-hover:scale-110 group-hover:-rotate-6" aria-hidden>
                 {m.icon}
               </span>
               <span className="font-display text-lg font-bold">
@@ -147,7 +150,7 @@ export default async function Landing() {
       <section className="grid gap-3 sm:grid-cols-3">
         {steps.map((s, i) => (
           <div key={i} className="flex items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel-2 font-display font-bold text-cyan">{i + 1}</span>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-display text-lg font-bold text-ink ${["bg-lime", "bg-cyan", "bg-pink"][i]}`}>{i + 1}</span>
             <div>
               <h3 className="font-display text-lg font-bold">{s.title}</h3>
               <p className="mt-0.5 text-sm text-mute">{s.body}</p>

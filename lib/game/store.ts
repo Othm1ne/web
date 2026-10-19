@@ -5,6 +5,7 @@ import * as repo from "../db/repo";
 import type { GameSummary } from "../types";
 import { Game, GameError, summarize, totalScore } from "./engine";
 import { MAX_GAMES_PER_HOUR, unrankedReason } from "./integrity";
+import { type PlayerStats, isTimeZone, levelFor, streakFor } from "./progress";
 import { type BoardFilter, rankOf, rankPlayers } from "./leaderboard";
 
 export type { LoadedGame };
@@ -44,14 +45,29 @@ export async function leaderboard(filter: BoardFilter, youId?: string, limit = 5
 
 export async function summaryFor(game: Game): Promise<GameSummary> {
   if (game.finishedAt === undefined) throw new GameError("game_not_finished", 409);
-  const entries = await repo.bestEntries(await getDb(), { artistId: game.artist.id });
+  const db = await getDb();
+  const [entries, previousBest] = await Promise.all([
+    repo.bestEntries(db, { artistId: game.artist.id }),
+    repo.previousBest(db, game.player.id, game.artist.id, game.id),
+  ]);
   const rows = rankPlayers(entries, game.player.id);
   return summarize(game, {
     rank: rankOf(totalScore(game), entries, game.player.id),
     players: rows.length,
     top: rows.slice(0, 3),
     unranked: unrankedReason(game),
+    previousBest,
   });
+}
+
+/**
+ * Level, daily streak and best score for the player's header chip and progress card. The streak
+ * counts days in the player's time zone (falling back to UTC for an unknown one).
+ */
+export async function statsFor(userId: string, timeZone = "UTC", now = Date.now()): Promise<PlayerStats> {
+  const zone = isTimeZone(timeZone) ? timeZone : "UTC";
+  const { xp, best, days } = await repo.playerTotals(await getDb(), userId, zone, now);
+  return { ...levelFor(xp), ...streakFor(days, now, zone), best };
 }
 
 /** Refuses a new solo game once the player has started too many in the last hour. */

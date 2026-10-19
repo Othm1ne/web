@@ -2,9 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OPTION_TONES } from "@/components/EventUI";
 import { Equalizer } from "@/components/Logo";
 import { TimerRing } from "@/components/TimerRing";
 import { errorMessage } from "@/lib/client";
+import { setSfxMuted, sfx, unlockSfx } from "@/lib/sfx";
 import { decryptClip } from "@/lib/game/clip";
 import { activeDict } from "@/lib/i18n/active";
 import { fmt } from "@/lib/i18n/config";
@@ -70,6 +72,10 @@ export function GameClient() {
   const [reveal, setReveal] = useState<RevealResult | null>(null);
   const [total, setTotal] = useState(0);
   const [muted, setMuted] = useState(false);
+  // Right answers in a row: purely for show (and sound), scoring ignores it.
+  const [combo, setCombo] = useState(0);
+  const comboRef = useRef(0);
+  const lastTick = useRef(0);
 
   const audio = useRef<HTMLAudioElement | null>(null);
   const clips = useRef<Promise<Clip>[]>([]);
@@ -128,6 +134,10 @@ export function GameClient() {
       setPicked(optionId);
       try {
         const res = await post<RevealResult>(`/api/games/${id}/rounds/${i}/answer`, { optionId });
+        comboRef.current = res.correct ? comboRef.current + 1 : 0;
+        setCombo(comboRef.current);
+        if (res.correct) sfx.correct(comboRef.current);
+        else sfx.wrong();
         setReveal(res);
         setTotal(res.total);
         setPhase("reveal");
@@ -170,9 +180,16 @@ export function GameClient() {
       el.currentTime = 0;
       await el.play().catch(() => {});
       const startedAt = performance.now();
+      lastTick.current = 0;
       timer.current = window.setInterval(() => {
         const left = game.roundMs - (performance.now() - startedAt);
         setRemaining(Math.max(0, left));
+        // Tick through the last three seconds.
+        const second = Math.ceil(left / 1000);
+        if (second <= 3 && second > 0 && second !== lastTick.current) {
+          lastTick.current = second;
+          sfx.tick();
+        }
         if (left <= 0) submit(i, null);
       }, 100);
     },
@@ -181,6 +198,8 @@ export function GameClient() {
 
   // Tapping "start" is a user gesture, which lets the browser autoplay the clips.
   function begin() {
+    unlockSfx();
+    sfx.count();
     audio.current!.muted = muted;
     audio.current!.play().catch(() => {});
     audio.current!.pause();
@@ -191,8 +210,12 @@ export function GameClient() {
       n -= 1;
       if (n === 0) {
         clearInterval(t);
+        sfx.count(true);
         startRound(0);
-      } else setCount(n);
+      } else {
+        sfx.count();
+        setCount(n);
+      }
     }, 800);
   }
 
@@ -213,21 +236,23 @@ export function GameClient() {
   function toggleMute() {
     setMuted((m) => {
       if (audio.current) audio.current.muted = !m;
+      setSfxMuted(!m);
       return !m;
     });
   }
 
   const round = game?.rounds[index];
   const isLast = game ? index + 1 >= game.rounds.length : false;
+  const urgent = phase === "playing" && remaining > 0 && remaining <= 3000;
 
   return (
-    <div className="flex flex-1 flex-col gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <audio ref={audio} preload="auto" />
 
       {phase === "error" && (
         <div className="m-auto flex flex-col items-center gap-4 text-center">
           <p className="text-lg">{error}</p>
-          <button onClick={() => router.push("/play")} className="rounded-2xl bg-lime px-6 py-3 font-bold text-ink">
+          <button onClick={() => router.push("/play")} className="btn-press rounded-2xl bg-lime px-6 py-3 font-bold text-ink">
             {d.game.back}
           </button>
         </div>
@@ -242,17 +267,24 @@ export function GameClient() {
 
       {(phase === "ready" || phase === "countdown") && game && (
         <div className="m-auto flex flex-col items-center gap-6 text-center">
-          {game.artist.image && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={game.artist.image} alt="" className="h-40 w-40 rounded-3xl object-cover shadow-2xl" />
-          )}
-          <h1 className="font-display text-3xl font-bold">{game.artist.name}</h1>
+          <div className="relative">
+            <div className="absolute -inset-6 rounded-full bg-gradient-to-br from-violet/40 via-pink/30 to-cyan/30 blur-2xl" aria-hidden />
+            {game.artist.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={game.artist.image} alt="" className="relative h-44 w-44 rounded-3xl object-cover shadow-2xl ring-4 ring-white/10" />
+            ) : (
+              <span className="relative flex h-44 w-44 items-center justify-center rounded-3xl bg-gradient-to-br from-violet to-pink text-7xl shadow-2xl" aria-hidden>
+                🎧
+              </span>
+            )}
+          </div>
+          <h1 className="font-display text-4xl font-bold">{game.artist.name}</h1>
           {phase === "ready" ? (
-            <button onClick={begin} className="rounded-2xl bg-lime px-10 py-4 font-display text-lg font-bold text-ink">
+            <button onClick={begin} className="btn-press rounded-2xl bg-lime px-12 py-4 font-display text-xl font-bold text-ink">
               {d.game.ready}
             </button>
           ) : (
-            <span key={count} className="pop font-display text-7xl font-bold text-lime">{count}</span>
+            <span key={count} className="pop font-display text-8xl font-bold text-gradient">{count}</span>
           )}
         </div>
       )}
@@ -266,17 +298,24 @@ export function GameClient() {
 
       {(phase === "playing" || phase === "reveal") && game && round && (
         <>
-          <div className="flex items-center gap-3">
+          {phase === "reveal" && reveal && (
+            <div key={`flash-${index}`} className={`flash ${reveal.correct ? "bg-lime" : "bg-coral"}`} aria-hidden />
+          )}
+          <div className="flex items-center gap-2">
             <span className="font-display text-sm font-bold">
-              {index + 1}<span className="text-mute"> / {game.rounds.length}</span>
+              {index + 1}<span className="text-mute">/{game.rounds.length}</span>
             </span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan to-lime transition-all"
-                style={{ width: `${((index + (phase === "reveal" ? 1 : 0)) / game.rounds.length) * 100}%` }}
-              />
+            <div className="flex flex-1 gap-1">
+              {game.rounds.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-2 flex-1 rounded-full transition-colors ${
+                    i < index || (i === index && phase === "reveal") ? "bg-gradient-to-r from-cyan to-lime" : i === index ? "bg-white/40" : "bg-panel-2"
+                  }`}
+                />
+              ))}
             </div>
-            <span className="font-display text-sm font-bold text-lime">{fmt(d.common.pts, { n: total })}</span>
+            <span className="rounded-full bg-lime/10 px-2.5 py-1 font-display text-sm font-bold text-lime">{fmt(d.common.pts, { n: total })}</span>
             <button onClick={toggleMute} aria-label={muted ? d.common.unmute : d.common.mute} className="rounded-lg border border-line px-2 py-1 text-sm">
               {muted ? "🔇" : "🔊"}
             </button>
@@ -285,34 +324,51 @@ export function GameClient() {
             </button>
           </div>
 
+          {combo >= 2 && (
+            <p key={`combo-${combo}`} className="pop self-center rounded-full bg-gradient-to-r from-amber to-pink px-4 py-1 font-display font-bold text-ink shadow-[0_0_24px_-6px_var(--color-pink)]">
+              🔥 {fmt(d.game.combo, { n: combo })}
+            </p>
+          )}
+
           {phase === "playing" ? (
-            <div className="flex items-center justify-between rounded-3xl border border-line bg-panel p-6">
+            <div className="flex items-center justify-between rounded-3xl border border-line bg-gradient-to-br from-panel to-panel-2 p-5">
               <div className="flex flex-col gap-2">
                 <Equalizer />
                 <h1 className="font-display text-2xl font-bold">{d.common.whatSong}</h1>
                 <p className="text-sm text-mute">{d.game.hint}</p>
               </div>
-              <TimerRing remaining={remaining} total={game.roundMs} />
+              <div className={urgent ? "urgent" : ""}>
+                <TimerRing remaining={remaining} total={game.roundMs} />
+              </div>
             </div>
           ) : (
             reveal && (
-              <div className="flex gap-4 rounded-3xl border border-line bg-panel p-4">
+              <div
+                key={`reveal-${index}`}
+                className={`relative flex gap-4 rounded-3xl border-2 p-4 ${reveal.correct ? "border-lime bg-lime/10" : "shake border-coral bg-coral/10"}`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={reveal.track.cover} alt="" className="h-28 w-28 shrink-0 rounded-2xl object-cover sm:h-36 sm:w-36" />
+                <img src={reveal.track.cover} alt="" className="pop h-28 w-28 shrink-0 rounded-2xl object-cover shadow-xl sm:h-36 sm:w-36" />
                 <div className="flex min-w-0 flex-col justify-center gap-1">
-                  <span className={`pop font-display text-3xl font-bold ${reveal.correct ? "text-lime" : "text-coral"}`}>
+                  <span className={`pop font-display text-4xl font-bold ${reveal.correct ? "text-lime" : "text-coral"}`}>
                     {reveal.correct ? `+${reveal.points}` : picked ? d.common.wrong : d.game.timesUp}
                   </span>
                   <p className="truncate font-display text-lg font-bold">{reveal.track.title}</p>
                   <p className="truncate text-sm text-mute">{reveal.track.artist} · {reveal.track.album}</p>
                   {reveal.correct && <p className="text-xs text-mute">{fmt(d.common.seconds, { n: (reveal.elapsedMs / 1000).toFixed(1) })}</p>}
                 </div>
+                {reveal.correct && (
+                  <span className="rise absolute end-4 top-2 font-display text-2xl font-bold text-lime" aria-hidden>
+                    +{reveal.points}
+                  </span>
+                )}
               </div>
             )
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {round.options.map((o) => {
+            {round.options.map((o, i) => {
+              const tone = OPTION_TONES[i % OPTION_TONES.length];
               const isAnswer = reveal?.correctOptionId === o.id;
               const isWrongPick = reveal && picked === o.id && !isAnswer;
               return (
@@ -320,16 +376,23 @@ export function GameClient() {
                   key={o.id}
                   disabled={phase !== "playing"}
                   onClick={() => submit(index, o.id)}
-                  className={`flex items-center gap-3 rounded-2xl border p-3 text-start transition ${
+                  className={`flex items-center gap-3 rounded-2xl border-2 p-2.5 text-start transition active:scale-[0.97] ${
                     isAnswer
-                      ? "border-lime bg-lime/10"
+                      ? "border-lime bg-lime/15 shadow-[0_0_30px_-10px_var(--color-lime)]"
                       : isWrongPick
                         ? "border-coral bg-coral/10"
                         : picked === o.id
-                          ? "border-cyan bg-panel-2"
-                          : "border-line bg-panel enabled:hover:border-cyan disabled:opacity-60"
+                          ? `${tone.ring} ${tone.fill}`
+                          : `border-line bg-panel ${tone.hover} disabled:opacity-50`
                   }`}
                 >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-lg font-bold text-ink ${
+                      isAnswer ? "bg-lime" : isWrongPick ? "bg-coral" : tone.chip
+                    }`}
+                  >
+                    {isAnswer ? "✓" : isWrongPick ? "✕" : tone.letter}
+                  </span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={o.cover} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
                   <span className="line-clamp-2 font-medium">{o.title}</span>
@@ -339,8 +402,8 @@ export function GameClient() {
           </div>
 
           {phase === "reveal" && (
-            <button onClick={next} className="relative mt-auto overflow-hidden rounded-2xl bg-panel-2 py-4 font-display font-bold">
-              <span className="fill-bar absolute inset-y-0 start-0 bg-line" style={{ animationDuration: `${REVEAL_MS}ms` }} />
+            <button onClick={next} className="btn-press relative mt-auto overflow-hidden rounded-2xl bg-cyan py-4 font-display text-lg font-bold text-ink [--press:#1a8f9c]">
+              <span className="fill-bar absolute inset-y-0 start-0 bg-white/30" style={{ animationDuration: `${REVEAL_MS}ms` }} />
               <span className="relative">{isLast ? d.game.seeResults : d.common.nextSong}</span>
             </button>
           )}

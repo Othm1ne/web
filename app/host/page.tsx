@@ -181,7 +181,7 @@ export default function HostPage() {
       <div className="m-auto flex max-w-sm flex-col items-center gap-4 text-center">
         <h1 className="font-display text-3xl font-bold">{d.host.title}</h1>
         <p className="text-mute">{d.host.pitch}</p>
-        <a href={googleSignInUrl("/host")} className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
+        <a href={googleSignInUrl("/host")} className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
           {d.common.signInGoogle}
         </a>
       </div>
@@ -341,7 +341,7 @@ export default function HostPage() {
           <button
             onClick={create}
             disabled={picked.length < MIN_SONGS || creating}
-            className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink transition hover:scale-[1.03] disabled:opacity-50"
+            className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink disabled:opacity-50"
           >
             {creating ? d.host.creating : d.host.create}
           </button>

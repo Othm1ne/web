@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Game } from "../game/engine";
 import { totalScore } from "../game/engine";
 import { unrankedReason } from "../game/integrity";
+import { dayNumber } from "../game/progress";
 import type { BoardFilter, Entry, Period } from "../game/leaderboard";
 import type { Player, User } from "../types";
 import type { Db } from "./index";
@@ -84,6 +85,34 @@ export async function recordResult(db: Db, game: Game) {
       unrankedReason(game) === null,
     ],
   );
+}
+
+/**
+ * A player's lifetime points (ranked games only, so flagged games can't farm levels), best
+ * score, and the local dates (in `timeZone`, an IANA name) they finished a game in the last
+ * year, as day numbers for the daily streak.
+ */
+export async function playerTotals(db: Db, userId: string, timeZone = "UTC", now = Date.now()) {
+  const [totals] = await db.query<{ xp: number; best: number }>(
+    `select coalesce(sum(score), 0)::int as xp, coalesce(max(score), 0)::int as best
+     from games where user_id = $1 and ranked`,
+    [userId],
+  );
+  const days = await db.query<{ day: string }>(
+    `select distinct to_char(finished_at at time zone $3, 'YYYY-MM-DD') as day
+     from games where user_id = $1 and finished_at >= $2`,
+    [userId, new Date(now - 367 * 86_400_000).toISOString(), timeZone],
+  );
+  return { ...totals, days: days.map((r) => dayNumber(r.day)) };
+}
+
+/** The player's best ranked score on a source before this game, or null if it's their first. */
+export async function previousBest(db: Db, userId: string, artistId: string, gameId: string): Promise<number | null> {
+  const [row] = await db.query<{ best: number | null }>(
+    `select max(score)::int as best from games where user_id = $1 and artist_id = $2 and id <> $3 and ranked`,
+    [userId, artistId, gameId],
+  );
+  return row?.best ?? null;
 }
 
 const PERIOD_MS: Record<Period, number> = { day: 86_400_000, week: 7 * 86_400_000, all: 0 };

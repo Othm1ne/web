@@ -30,7 +30,7 @@ export function HostClient() {
     return (
       <div className="m-auto flex flex-col items-center gap-4 text-center">
         <p className="text-lg">{fmt(d.hostScreen.notHost, { code: view.code })}</p>
-        <Link href={`/e/${view.code}`} className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
+        <Link href={`/e/${view.code}`} className="btn-press rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
           {d.hostScreen.joinAsPlayer}
         </Link>
       </div>
@@ -58,7 +58,7 @@ export function HostClient() {
   const onScreen = view.mode === "screen";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex min-h-full max-w-6xl flex-col gap-6 px-4 py-4 sm:px-8 sm:py-6">
         <header className="flex flex-wrap items-center gap-3">
           <Logo />
@@ -117,7 +117,7 @@ export function HostClient() {
               <button
                 onClick={onNext}
                 disabled={busy || view.playerCount === 0}
-                className="mt-2 rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink transition hover:scale-[1.02] disabled:opacity-50"
+                className="mt-2 btn-press rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink disabled:opacity-50"
               >
                 {busy ? d.hostScreen.starting : d.hostScreen.start}
               </button>
@@ -180,7 +180,7 @@ export function HostClient() {
               <button
                 onClick={onNext}
                 disabled={busy}
-                className="mt-auto rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink transition hover:scale-[1.02] disabled:opacity-50"
+                className="mt-auto btn-press rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink disabled:opacity-50"
               >
                 {busy ? "…" : isLast ? d.hostScreen.finalResults : d.common.nextSong}
               </button>
@@ -213,7 +213,7 @@ export function HostClient() {
                 <Standings rows={view.standings.slice(3)} />
               </div>
             )}
-            <Link href="/host" className="rounded-2xl bg-lime px-8 py-4 font-display text-lg font-bold text-ink">
+            <Link href="/host" className="btn-press rounded-2xl bg-lime px-8 py-4 font-display text-lg font-bold text-ink">
               {d.hostScreen.hostAnother}
             </Link>
           </div>
