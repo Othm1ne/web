@@ -33,6 +33,15 @@ export async function loadLiveGame(db: Db, id: string): Promise<LoadedGame | nul
   return { game: fromStored(typeof row.state === "string" ? JSON.parse(row.state) : row.state), version: row.version };
 }
 
+/** How many solo games the player started in the last `windowMs` (finished or not). */
+export async function countRecentGames(db: Db, userId: string, windowMs: number, now = Date.now()): Promise<number> {
+  const [row] = await db.query<{ n: number }>(
+    `select count(*)::int as n from live_games where user_id = $1 and created_at > $2`,
+    [userId, new Date(now - windowMs).toISOString()],
+  );
+  return row.n;
+}
+
 /** Saves a changed game unless another request changed it first (e.g. a double tap). */
 export async function updateLiveGame(db: Db, { game, version }: LoadedGame) {
   const rows = await db.query(

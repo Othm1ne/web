@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { GenreSearch } from "@/components/GenreSearch";
 import { errorMessage } from "@/lib/client";
+import { useI18n } from "@/lib/i18n/client";
 import { GENRES, genreSourceId } from "@/lib/music/genres";
 import type { ArtistSummary, HostTrack } from "@/lib/types";
 
@@ -22,6 +23,7 @@ function shuffle<T>(items: T[]): T[] {
  * genre's current chart. The host can still edit the list afterwards.
  */
 export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill: (tracks: HostTrack[], from: string) => void }) {
+  const { d } = useI18n();
   const [count, setCount] = useState(10);
   const [query, setQuery] = useState("");
   const [featured, setFeatured] = useState<ArtistSummary[] | null>(null);
@@ -69,8 +71,8 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-sm text-mute">
-        Add
+      <div className="flex flex-wrap items-center gap-2 text-sm text-mute">
+        {d.sourceFill.add}
         {COUNTS.map((n) => (
           <button
             key={n}
@@ -80,7 +82,7 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
             {n}
           </button>
         ))}
-        random songs {kind === "artist" ? "from an artist" : "from a genre"}
+        {kind === "artist" ? d.sourceFill.fromArtist : d.sourceFill.fromGenre}
       </div>
 
       {kind === "artist" ? (
@@ -89,13 +91,13 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search an artist…"
+            placeholder={d.play.searchArtist}
             className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
           />
           {artists === null ? (
-            <p className="text-mute">Loading artists…</p>
+            <p className="text-mute">{d.play.loadingArtists}</p>
           ) : artists.length === 0 ? (
-            <p className="text-mute">No artists found.</p>
+            <p className="text-mute">{d.play.noArtists}</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {artists.map((a) => (
@@ -103,11 +105,11 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
                   key={a.id}
                   onClick={() => fill(a.id, a.name)}
                   disabled={loading !== null}
-                  className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2 text-left transition hover:border-cyan disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2 text-start transition hover:border-cyan disabled:opacity-60"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {a.image ? <img src={a.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="h-10 w-10 shrink-0 rounded-full bg-panel-2" />}
-                  <span className="line-clamp-2 text-sm font-medium">{loading === a.id ? "Adding…" : a.name}</span>
+                  <span className="line-clamp-2 text-sm font-medium">{loading === a.id ? d.sourceFill.adding : a.name}</span>
                 </button>
               ))}
             </div>
@@ -122,9 +124,9 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
               key={g.slug}
               onClick={() => fill(genreSourceId(g.slug), g.name)}
               disabled={loading !== null}
-              className={`flex h-16 items-end rounded-xl bg-gradient-to-br p-2.5 text-left font-display font-bold text-white transition hover:scale-[1.02] disabled:opacity-60 ${g.tone}`}
+              className={`flex h-16 items-end rounded-xl bg-gradient-to-br p-2.5 text-start font-display font-bold text-white transition hover:scale-[1.02] disabled:opacity-60 ${g.tone}`}
             >
-              {loading === genreSourceId(g.slug) ? "Adding…" : g.name}
+              {loading === genreSourceId(g.slug) ? d.sourceFill.adding : g.name}
             </button>
           ))}
         </div>

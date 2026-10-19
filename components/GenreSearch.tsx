@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 import { type Genre, searchGenres } from "@/lib/music/genres";
 
 /** Type any genre ("afrobeats", "grunge", "anime"…) and pick from the matching iTunes charts. */
 export function GenreSearch({ onPick, disabled = false }: { onPick: (genre: Genre) => void; disabled?: boolean }) {
+  const { d } = useI18n();
   const [query, setQuery] = useState("");
   const q = query.trim();
   const matches = searchGenres(q);
@@ -15,12 +18,12 @@ export function GenreSearch({ onPick, disabled = false }: { onPick: (genre: Genr
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Type any genre: afrobeats, grunge, anime…"
-        aria-label="Search genres"
+        placeholder={d.genreSearch.placeholder}
+        aria-label={d.genreSearch.label}
         className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
       />
       {q && (matches.length === 0 ? (
-        <p className="text-sm text-mute">No genre matches &ldquo;{q}&rdquo;. Try a broader one, or search an artist.</p>
+        <p className="text-sm text-mute">{fmt(d.genreSearch.noMatch, { q })}</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {matches.map((g) => (

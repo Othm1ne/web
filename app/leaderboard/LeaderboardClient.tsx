@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { errorMessage } from "@/lib/client";
+import type { Dict } from "@/lib/i18n/dictionaries/en";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 import type { LeaderboardRow } from "@/lib/types";
 
 type Board = {
@@ -15,9 +18,9 @@ type Board = {
 };
 
 const PERIODS = [
-  { id: "day", label: "Today" },
-  { id: "week", label: "This week" },
-  { id: "all", label: "All time" },
+  { id: "day", label: (d: Dict) => d.leaderboard.today },
+  { id: "week", label: (d: Dict) => d.leaderboard.week },
+  { id: "all", label: (d: Dict) => d.leaderboard.allTime },
 ];
 
 const flag = (country: string | null) =>
@@ -37,17 +40,19 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 function Row({ row }: { row: LeaderboardRow }) {
+  const { d } = useI18n();
   return (
     <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${row.isYou ? "border border-lime bg-lime/10" : "bg-panel"}`}>
       <span className="w-10 font-display font-bold text-cyan">#{row.rank}</span>
       <span className="w-6 text-center" aria-label={row.country ?? undefined}>{flag(row.country)}</span>
-      <span className="flex-1 truncate">{row.handle}{row.isYou && " (you)"}</span>
+      <span className="flex-1 truncate">{row.handle}{row.isYou && d.common.you}</span>
       <span className="font-display font-bold">{row.score}</span>
     </div>
   );
 }
 
 export function LeaderboardClient() {
+  const { d } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -82,28 +87,28 @@ export function LeaderboardClient() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl font-bold">Leaderboard</h1>
-        <p className="text-mute">Each player&apos;s best game counts.</p>
+        <h1 className="font-display text-3xl font-bold">{d.nav.leaderboard}</h1>
+        <p className="text-mute">{d.leaderboard.intro}</p>
       </div>
 
       <div className="flex flex-col gap-3">
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <Chip active={!artistId} onClick={() => set("artistId", "")}>All artists</Chip>
+          <Chip active={!artistId} onClick={() => set("artistId", "")}>{d.leaderboard.allArtists}</Chip>
           {data?.artists.map((a) => (
             <Chip key={a.id} active={artistId === a.id} onClick={() => set("artistId", a.id)}>{a.name}</Chip>
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Chip active={!country} onClick={() => set("country", "")}>Global</Chip>
+          <Chip active={!country} onClick={() => set("country", "")}>{d.leaderboard.global}</Chip>
           {(data?.userCountry || country) && (
             <Chip active={!!country} onClick={() => set("country", country || data!.userCountry!)}>
-              {flag(country || data!.userCountry)} My country
+              {flag(country || data!.userCountry)} {d.leaderboard.myCountry}
             </Chip>
           )}
           <span className="mx-1 w-px bg-line" />
           {PERIODS.map((p) => (
             <Chip key={p.id} active={period === p.id} onClick={() => set("period", p.id === "all" ? "" : p.id)}>
-              {p.label}
+              {p.label(d)}
             </Chip>
           ))}
         </div>
@@ -112,15 +117,15 @@ export function LeaderboardClient() {
       {error ? (
         <p className="text-coral">{error}</p>
       ) : !data ? (
-        <p className="text-mute">Loading scores…</p>
+        <p className="text-mute">{d.leaderboard.loading}</p>
       ) : (
         <section className={`flex flex-col gap-2 transition-opacity ${loading ? "opacity-50" : ""}`}>
-          <p className="text-sm text-mute">{data.players} {data.players === 1 ? "player" : "players"}</p>
+          <p className="text-sm text-mute">{fmt(data.players === 1 ? d.common.player : d.common.players, { n: data.players })}</p>
           {data.top.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-panel p-8 text-center">
-              <p>No scores here yet.</p>
+              <p>{d.leaderboard.empty}</p>
               <Link href="/play" className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
-                Be the first
+                {d.leaderboard.beFirst}
               </Link>
             </div>
           ) : (

@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
 import { GenreSearch } from "@/components/GenreSearch";
+import { activeDict } from "@/lib/i18n/active";
+import { useI18n } from "@/lib/i18n/client";
 import { GENRES, type Genre, genreFromSource, genreSourceId } from "@/lib/music/genres";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 import type { ArtistSummary } from "@/lib/types";
@@ -17,7 +19,7 @@ function GenreTile({ genre, selected, onSelect }: { genre: Genre; selected: bool
   return (
     <button
       onClick={onSelect}
-      className={`relative flex aspect-[4/3] items-end overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-left transition ${genre.tone} ${
+      className={`relative flex aspect-[4/3] items-end overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-start transition ${genre.tone} ${
         selected ? "ring-4 ring-lime" : "hover:scale-[1.02]"
       }`}
     >
@@ -51,6 +53,7 @@ function ArtistCard({ artist, selected, onSelect }: { artist: ArtistSummary; sel
 }
 
 export function PlayClient() {
+  const { d } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   // /play?genre=pop (from the home screen) opens the genre tab with that genre picked.
@@ -73,7 +76,7 @@ export function PlayClient() {
       .then((r) => {
         setUser(r.user);
         setGoogle(r.google);
-        if (signinFailed) setNotice("Google sign-in didn't work. You can keep playing as a guest.");
+        if (signinFailed) setNotice(activeDict().play.googleFailed);
       })
       .catch((e) => setError((e as Error).message));
 
@@ -144,16 +147,16 @@ export function PlayClient() {
   return (
     <div className="flex flex-col gap-6 pb-28">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl font-bold">Solo game</h1>
-        <p className="text-mute">10 clips, 10 seconds each. Pick one artist, or a whole genre.</p>
+        <h1 className="font-display text-3xl font-bold">{d.play.title}</h1>
+        <p className="text-mute">{d.play.intro}</p>
       </div>
 
       <label className="flex flex-col gap-1 text-sm text-mute">
-        Your nickname
+        {d.common.nickname}
         <input
           value={handle}
           maxLength={24}
-          placeholder={user ? "" : "Loading…"}
+          placeholder={user ? "" : d.common.loading}
           onChange={(e) => setHandle(e.target.value)}
           className="rounded-xl border border-line bg-panel px-4 py-3 text-base text-white outline-none focus:border-cyan"
         />
@@ -161,8 +164,8 @@ export function PlayClient() {
 
       {user && (user.provider === "google" ? (
         <p className="-mt-3 text-sm text-mute">
-          Signed in with Google.{" "}
-          <button onClick={logout} className="text-cyan hover:underline">Sign out</button>
+          {d.play.googleSignedIn}{" "}
+          <button onClick={logout} className="text-cyan hover:underline">{d.play.signOut}</button>
         </p>
       ) : google ? (
         <a
@@ -175,12 +178,12 @@ export function PlayClient() {
             <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
           </svg>
-          Sign in with Google to keep your scores on every device
+          {d.play.googlePitch}
         </a>
       ) : null)}
       {notice && <p className="-mt-3 text-sm text-coral">{notice}</p>}
 
-      <div role="tablist" aria-label="Game type" className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-panel p-1">
+      <div role="tablist" aria-label={d.play.gameType} className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-panel p-1">
         {(["artist", "genre"] as const).map((t) => (
           <button
             key={t}
@@ -189,14 +192,14 @@ export function PlayClient() {
             onClick={() => setTab(t)}
             className={`rounded-xl py-2.5 font-display font-bold transition ${tab === t ? "bg-lime text-ink" : "text-mute hover:text-white"}`}
           >
-            {t === "artist" ? "By artist" : "By genre"}
+            {t === "artist" ? d.play.byArtist : d.play.byGenre}
           </button>
         ))}
       </div>
 
       {tab === "genre" ? (
         <section className="flex flex-col gap-3">
-          <p className="text-sm text-mute">Current hits from the genre&apos;s chart, from lots of different artists.</p>
+          <p className="text-sm text-mute">{d.play.genreIntro}</p>
           <GenreSearch onPick={(g) => select(genreSource(g))} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {GENRES.map((g) => (
@@ -210,18 +213,18 @@ export function PlayClient() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search an artist…"
+            placeholder={d.play.searchArtist}
             className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
           />
 
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium uppercase tracking-widest text-mute">
-              {q.length >= 2 ? "Search results" : "Popular picks"}
+              {q.length >= 2 ? d.play.searchResults : d.play.popularPicks}
             </h2>
             {list === null ? (
-              <p className="text-mute">Loading artists…</p>
+              <p className="text-mute">{d.play.loadingArtists}</p>
             ) : list.length === 0 ? (
-              <p className="text-mute">No artists found.</p>
+              <p className="text-mute">{d.play.noArtists}</p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {list.map((a) => (
@@ -237,7 +240,7 @@ export function PlayClient() {
         <div className="fixed inset-x-0 bottom-0 border-t border-line bg-ink/90 px-4 py-4 backdrop-blur">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-widest text-mute">{isGenre ? "Genre" : "Artist"}</p>
+              <p className="text-xs uppercase tracking-widest text-mute">{isGenre ? d.play.genre : d.play.artist}</p>
               <p className="truncate font-display text-lg font-bold">{selected.name}</p>
               {error && <p className="text-sm text-coral">{error}</p>}
             </div>
@@ -246,7 +249,7 @@ export function PlayClient() {
               disabled={starting || !user}
               className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink transition hover:scale-[1.03] disabled:opacity-60"
             >
-              {starting ? "Building game…" : "Start game"}
+              {starting ? d.play.building : d.play.start}
             </button>
           </div>
         </div>

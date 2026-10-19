@@ -7,12 +7,15 @@ import { CountdownNumber, OptionCard, Standings } from "@/components/EventUI";
 import { Equalizer, Logo } from "@/components/Logo";
 import { TimerRing } from "@/components/TimerRing";
 import { useEventAudio } from "@/lib/event/useEventAudio";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 import { useLiveEvent, useTicker } from "@/lib/event/useLiveEvent";
 
 const noopSubscribe = () => () => {};
 const useHost = () => useSyncExternalStore(noopSubscribe, () => window.location.host, () => "");
 
 export function HostClient() {
+  const { d } = useI18n();
   const { code } = useParams<{ code: string }>();
   const { view, error, serverNow, next } = useLiveEvent(code);
   const sound = useEventAudio(view, serverNow);
@@ -21,14 +24,14 @@ export function HostClient() {
   const [actionError, setActionError] = useState("");
   useTicker(view?.phase === "countdown" || view?.phase === "question");
 
-  if (!view) return <p className="m-auto text-mute">{error || "Loading event…"}</p>;
+  if (!view) return <p className="m-auto text-mute">{error || d.hostScreen.loading}</p>;
 
   if (view.role !== "host") {
     return (
       <div className="m-auto flex flex-col items-center gap-4 text-center">
-        <p className="text-lg">This is the host screen for event {view.code}.</p>
+        <p className="text-lg">{fmt(d.hostScreen.notHost, { code: view.code })}</p>
         <Link href={`/e/${view.code}`} className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
-          Join as a player
+          {d.hostScreen.joinAsPlayer}
         </Link>
       </div>
     );
@@ -50,7 +53,7 @@ export function HostClient() {
 
   const now = serverNow();
   const round = view.round;
-  const roundLabel = `Round ${view.roundIndex + 1} of ${view.totalRounds}`;
+  const roundLabel = fmt(d.common.roundOf, { n: view.roundIndex + 1, total: view.totalRounds });
   const isLast = view.roundIndex + 1 >= view.totalRounds;
   const onScreen = view.mode === "screen";
 
@@ -61,38 +64,43 @@ export function HostClient() {
           <Logo />
           <span className="rounded-full bg-panel-2 px-3 py-1 font-display font-bold tracking-widest">{view.code}</span>
           {view.phase !== "lobby" && view.phase !== "finished" && <span className="text-mute">{roundLabel}</span>}
-          <span className="ml-auto text-mute">
-            {view.playerCount} {view.playerCount === 1 ? "player" : "players"}
+          <span className="ms-auto text-mute">
+            {fmt(view.playerCount === 1 ? d.common.player : d.common.players, { n: view.playerCount })}
           </span>
           {onScreen && (
-            <button onClick={sound.toggleMute} aria-label={sound.muted ? "Unmute" : "Mute"} className="rounded-lg border border-line px-2 py-1 text-sm">
+            <button onClick={sound.toggleMute} aria-label={sound.muted ? d.common.unmute : d.common.mute} className="rounded-lg border border-line px-2 py-1 text-sm">
               {sound.muted ? "🔇" : "🔊"}
             </button>
           )}
-          <Link href="/" className="rounded-lg border border-line px-2 py-1 text-sm" aria-label="Leave host screen">
+          <Link href="/" className="rounded-lg border border-line px-2 py-1 text-sm" aria-label={d.hostScreen.leave}>
             ✕
           </Link>
         </header>
 
         {view.phase === "lobby" && (
           <div className="grid flex-1 items-center gap-8 lg:grid-cols-2">
-            <section className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
+            <section className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-start">
               <p className="text-lg text-mute">
-                Join at <span className="font-bold text-white">{host}/join</span> with code
+                {fmt(d.hostScreen.joinAt, { url: "\u0000" }).split("\u0000").map((part, i) =>
+                  i === 0 ? part : (
+                    <span key={i}>
+                      <span className="font-bold text-white" dir="ltr">{host}/join</span>
+                      {part}
+                    </span>
+                  ),
+                )}
               </p>
-              <p className="font-display text-7xl font-bold tracking-[0.2em] text-lime sm:text-8xl">{view.code}</p>
+              <p className="font-display text-7xl font-bold tracking-[0.2em] text-lime sm:text-8xl" dir="ltr">{view.code}</p>
               <p className="max-w-md text-mute">
-                {onScreen
-                  ? "Music plays on this screen. Players answer on their phones."
-                  : "Music plays on each player's phone. Use this screen to run the game."}{" "}
-                {view.totalRounds} songs.
+                {onScreen ? d.hostScreen.screenInfo : d.hostScreen.phonesInfo}{" "}
+                {fmt(d.common.songs, { n: view.totalRounds })}.
               </p>
             </section>
             <section className="flex flex-col gap-4">
-              <h2 className="font-display text-2xl font-bold">Players</h2>
+              <h2 className="font-display text-2xl font-bold">{d.hostScreen.playersHeading}</h2>
               {view.standings.length === 0 ? (
                 <p className="flex items-center gap-3 text-mute">
-                  <Equalizer /> Waiting for players…
+                  <Equalizer /> {d.hostScreen.waiting}
                 </p>
               ) : (
                 <ul className="flex flex-wrap gap-2">
@@ -102,7 +110,7 @@ export function HostClient() {
                     </li>
                   ))}
                   {view.playerCount > view.standings.length && (
-                    <li className="rounded-full px-4 py-2 text-lg text-mute">+{view.playerCount - view.standings.length} more</li>
+                    <li className="rounded-full px-4 py-2 text-lg text-mute">{fmt(d.hostScreen.more, { n: view.playerCount - view.standings.length })}</li>
                   )}
                 </ul>
               )}
@@ -111,7 +119,7 @@ export function HostClient() {
                 disabled={busy || view.playerCount === 0}
                 className="mt-2 rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink transition hover:scale-[1.02] disabled:opacity-50"
               >
-                {busy ? "Starting…" : "Start the game"}
+                {busy ? d.hostScreen.starting : d.hostScreen.start}
               </button>
               {actionError && <p className="text-coral">{actionError}</p>}
             </section>
@@ -125,9 +133,10 @@ export function HostClient() {
             <div className="flex items-center justify-between gap-4 rounded-3xl border border-line bg-panel p-5 sm:p-6">
               <div className="flex flex-col gap-2">
                 <Equalizer />
-                <h1 className="font-display text-3xl font-bold sm:text-4xl">What song is this?</h1>
+                <h1 className="font-display text-3xl font-bold sm:text-4xl">{d.common.whatSong}</h1>
                 <p className="text-mute">
-                  {onScreen ? "Answer on your phone." : "Listen on your phone and answer there."} {round.answered} of {view.playerCount} answered
+                  {onScreen ? d.hostScreen.answerOnPhone : d.hostScreen.listenOnPhone}{" "}
+                  {fmt(d.hostScreen.answered, { n: round.answered, total: view.playerCount })}
                 </p>
               </div>
               <TimerRing remaining={view.startsAt + view.roundMs - now} total={view.roundMs} />
@@ -166,14 +175,14 @@ export function HostClient() {
               </div>
             </section>
             <section className="flex flex-col gap-4">
-              <h2 className="font-display text-2xl font-bold">Scores</h2>
+              <h2 className="font-display text-2xl font-bold">{d.hostScreen.scores}</h2>
               <Standings rows={view.standings} limit={5} big />
               <button
                 onClick={onNext}
                 disabled={busy}
                 className="mt-auto rounded-2xl bg-lime px-8 py-4 font-display text-xl font-bold text-ink transition hover:scale-[1.02] disabled:opacity-50"
               >
-                {busy ? "…" : isLast ? "Final results" : "Next song"}
+                {busy ? "…" : isLast ? d.hostScreen.finalResults : d.common.nextSong}
               </button>
               {actionError && <p className="text-coral">{actionError}</p>}
             </section>
@@ -182,7 +191,7 @@ export function HostClient() {
 
         {view.phase === "finished" && (
           <div className="flex flex-1 flex-col items-center gap-8">
-            <h1 className="font-display text-4xl font-bold sm:text-5xl">Final results</h1>
+            <h1 className="font-display text-4xl font-bold sm:text-5xl">{d.hostScreen.finalResults}</h1>
             <div className="flex w-full max-w-2xl items-end justify-center gap-3">
               {[1, 0, 2].map((i) => {
                 const p = view.standings[i];
@@ -205,7 +214,7 @@ export function HostClient() {
               </div>
             )}
             <Link href="/host" className="rounded-2xl bg-lime px-8 py-4 font-display text-lg font-bold text-ink">
-              Host another event
+              {d.hostScreen.hostAnother}
             </Link>
           </div>
         )}

@@ -77,4 +77,7 @@ export const SCHEMA = [
     created_at timestamptz not null default now()
   )`,
   `alter table live_games enable row level security`,
+  // Games kept off the leaderboard (see lib/game/integrity.ts).
+  `alter table games add column if not exists ranked boolean not null default true`,
+  `create index if not exists live_games_user on live_games (user_id, created_at)`,
 ];

@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { Game } from "../game/engine";
 import { totalScore } from "../game/engine";
+import { unrankedReason } from "../game/integrity";
 import type { BoardFilter, Entry, Period } from "../game/leaderboard";
 import type { Player, User } from "../types";
 import type { Db } from "./index";
@@ -67,8 +68,8 @@ export async function recordResult(db: Db, game: Game) {
   const answered = game.rounds.filter((r) => r.answer);
   const avgMs = answered.length ? Math.round(answered.reduce((s, r) => s + r.answer!.elapsedMs, 0) / answered.length) : 0;
   await db.query(
-    `insert into games (id, user_id, mode, artist_id, artist_name, score, correct_count, avg_ms, started_at, finished_at)
-     values ($1, $2, 'artist', $3, $4, $5, $6, $7, $8, $9)
+    `insert into games (id, user_id, mode, artist_id, artist_name, score, correct_count, avg_ms, started_at, finished_at, ranked)
+     values ($1, $2, 'artist', $3, $4, $5, $6, $7, $8, $9, $10)
      on conflict (id) do nothing`,
     [
       game.id,
@@ -80,6 +81,7 @@ export async function recordResult(db: Db, game: Game) {
       avgMs,
       new Date(game.createdAt).toISOString(),
       new Date(game.finishedAt ?? Date.now()).toISOString(),
+      unrankedReason(game) === null,
     ],
   );
 }
@@ -96,7 +98,8 @@ export async function bestEntries(db: Db, filter: BoardFilter, now = Date.now())
        g.artist_id as "artistId", g.artist_name as "artistName", g.score,
        (extract(epoch from g.finished_at) * 1000)::float8 as "at"
      from games g join users u on u.id = g.user_id
-     where ($1::text is null or g.artist_id = $1)
+     where g.ranked
+       and ($1::text is null or g.artist_id = $1)
        and ($2::text is null or u.country = $2)
        and g.finished_at >= $3
      order by g.user_id, g.score desc, g.finished_at asc`,

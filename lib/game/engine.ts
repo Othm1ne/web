@@ -137,7 +137,7 @@ export function toPublicGame(game: Game): PublicGame {
 
 export function summarize(
   game: Game,
-  board: Pick<GameSummary, "rank" | "players" | "top">,
+  board: Pick<GameSummary, "rank" | "players" | "top" | "unranked">,
 ): GameSummary {
   const answered = game.rounds.filter((r) => r.answer);
   return {

@@ -1,9 +1,10 @@
 // Games in progress and finished results, both in Postgres (serverless instances share nothing).
 import { getDb } from "../db";
-import { type LoadedGame, insertLiveGame, loadLiveGame, updateLiveGame } from "../db/liveGames";
+import { type LoadedGame, countRecentGames, insertLiveGame, loadLiveGame, updateLiveGame } from "../db/liveGames";
 import * as repo from "../db/repo";
 import type { GameSummary } from "../types";
 import { Game, GameError, summarize, totalScore } from "./engine";
+import { MAX_GAMES_PER_HOUR, unrankedReason } from "./integrity";
 import { type BoardFilter, rankOf, rankPlayers } from "./leaderboard";
 
 export type { LoadedGame };
@@ -49,5 +50,13 @@ export async function summaryFor(game: Game): Promise<GameSummary> {
     rank: rankOf(totalScore(game), entries, game.player.id),
     players: rows.length,
     top: rows.slice(0, 3),
+    unranked: unrankedReason(game),
   });
+}
+
+/** Refuses a new solo game once the player has started too many in the last hour. */
+export async function assertCanStartGame(userId: string) {
+  if ((await countRecentGames(await getDb(), userId, 3_600_000)) >= MAX_GAMES_PER_HOUR) {
+    throw new GameError("too_many_games", 429);
+  }
 }

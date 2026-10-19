@@ -1,4 +1,5 @@
 // Browser-side API helpers. Identity lives in an httpOnly session cookie set by the server.
+import { activeDict } from "./i18n/active";
 import type { User } from "./types";
 
 export type { User };
@@ -34,41 +35,8 @@ export async function createGame(artistId: string): Promise<string> {
   return (await call<{ id: string }>("/api/games", { method: "POST", body: { artistId } })).id;
 }
 
+/** The player-facing message for an API error code, in the visitor's language. */
 export function errorMessage(code?: string): string {
-  switch (code) {
-    case "not_enough_tracks":
-      return "This artist doesn't have enough playable tracks yet. Try another one.";
-    case "music_rate_limited":
-      return "The music catalog is busy. Wait a minute and try again.";
-    case "game_not_found":
-      return "This game has expired. Start a new one.";
-    case "unauthorized":
-      return "Your session expired. Reload the page to continue.";
-    case "invalid_request":
-      return "Nicknames need 2 to 24 characters.";
-    case "event_not_found":
-      return "No event with that code. Check the code on the host's screen.";
-    case "event_over":
-      return "This event has ended.";
-    case "host_cannot_play":
-      return "You're hosting this event, so you can't join it as a player.";
-    case "host_needs_google":
-      return "Sign in with Google to host an event.";
-    case "no_players":
-      return "Wait for at least one player to join.";
-    case "not_enough_songs":
-      return "Pick at least 4 songs.";
-    case "too_many_songs":
-      return "An event can have at most 30 songs.";
-    case "duplicate_songs":
-      return "Two of your songs have the same title. Remove one of them.";
-    case "songs_unavailable":
-      return "Some songs are no longer available. Remove them and try again.";
-    case "already_answered":
-      return "You already answered this round.";
-    case "round_over":
-      return "Too late, the round is over.";
-    default:
-      return "Something went wrong. Please try again.";
-  }
+  const errors = activeDict().errors;
+  return code && code !== "generic" && code in errors ? errors[code as keyof typeof errors] : errors.generic;
 }

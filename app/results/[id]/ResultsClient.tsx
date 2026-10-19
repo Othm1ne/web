@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createGame, errorMessage } from "@/lib/client";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 import type { GameSummary } from "@/lib/types";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
@@ -33,6 +35,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function ResultsClient() {
+  const { d } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<GameSummary | null>(null);
@@ -62,7 +65,7 @@ export function ResultsClient() {
   }
 
   if (error) return <p className="m-auto text-center text-lg">{error}</p>;
-  if (!summary) return <p className="m-auto text-mute">Tallying your score…</p>;
+  if (!summary) return <p className="m-auto text-mute">{d.results.tallying}</p>;
 
   const youInTop = summary.top.some((row) => row.isYou);
 
@@ -72,19 +75,22 @@ export function ResultsClient() {
         <p className="text-xs uppercase tracking-widest text-mute">{summary.artist.name}</p>
         <p className="font-display text-7xl font-bold text-lime">{score}</p>
         <div className="grid w-full grid-cols-3 gap-2">
-          <Stat label="Correct" value={`${summary.correctCount}/${summary.totalRounds}`} />
-          <Stat label="Avg time" value={`${(summary.avgMs / 1000).toFixed(1)}s`} />
-          <Stat label="Rank" value={`#${summary.rank}`} />
+          <Stat label={d.results.correct} value={`${summary.correctCount}/${summary.totalRounds}`} />
+          <Stat label={d.results.avgTime} value={fmt(d.common.seconds, { n: (summary.avgMs / 1000).toFixed(1) })} />
+          <Stat label={d.results.rank} value={summary.unranked ? "–" : `#${summary.rank}`} />
         </div>
+        {summary.unranked && (
+          <p className="text-sm text-coral">{d.results.unranked}</p>
+        )}
       </section>
 
       <section className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <h2 className="font-display text-xl font-bold">
-            Top players <span className="text-sm font-normal text-mute">· {summary.players} total</span>
+            {d.results.topPlayers} <span className="text-sm font-normal text-mute">{fmt(d.results.total, { n: summary.players })}</span>
           </h2>
           <Link href={`/leaderboard?artistId=${summary.artist.id}`} className="text-sm text-cyan hover:underline">
-            Full leaderboard
+            {d.results.fullLeaderboard}
           </Link>
         </div>
         {summary.top.map((row, i) => (
@@ -93,28 +99,28 @@ export function ResultsClient() {
             className={`flex items-center gap-3 rounded-xl px-4 py-3 ${row.isYou ? "border border-lime bg-lime/10" : "bg-panel"}`}
           >
             <span className="w-8 font-display font-bold text-cyan">#{row.rank}</span>
-            <span className="flex-1 truncate">{row.handle}{row.isYou && " (you)"}</span>
+            <span className="flex-1 truncate">{row.handle}{row.isYou && d.common.you}</span>
             <span className="font-display font-bold">{row.score}</span>
           </div>
         ))}
-        {!youInTop && (
+        {!youInTop && !summary.unranked && (
           <div className="flex items-center gap-3 rounded-xl border border-lime bg-lime/10 px-4 py-3">
             <span className="w-8 font-display font-bold text-cyan">#{summary.rank}</span>
-            <span className="flex-1 truncate">{summary.handle} (you)</span>
+            <span className="flex-1 truncate">{summary.handle}{d.common.you}</span>
             <span className="font-display font-bold">{summary.score}</span>
           </div>
         )}
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-display text-xl font-bold">Round by round</h2>
+        <h2 className="font-display text-xl font-bold">{d.results.roundByRound}</h2>
         {summary.rounds.map((r, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-xl bg-panel p-2 pr-4">
+          <div key={i} className="flex items-center gap-3 rounded-xl bg-panel p-2 pe-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={r.cover} alt="" className="h-12 w-12 rounded-lg object-cover" />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{r.title}</p>
-              <p className="text-xs text-mute">{r.correct ? `${(r.elapsedMs / 1000).toFixed(1)} s` : "missed"}</p>
+              <p className="text-xs text-mute">{r.correct ? fmt(d.common.seconds, { n: (r.elapsedMs / 1000).toFixed(1) }) : d.results.missed}</p>
             </div>
             <span className={`font-display font-bold ${r.correct ? "text-lime" : "text-coral"}`}>
               {r.correct ? `+${r.points}` : "0"}
@@ -126,14 +132,14 @@ export function ResultsClient() {
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-ink/90 px-4 py-4 backdrop-blur">
         <div className="mx-auto grid max-w-3xl grid-cols-2 gap-3">
           <Link href="/play" className="rounded-2xl border border-line py-3 text-center font-display font-bold">
-            New artist
+            {d.results.newArtist}
           </Link>
           <button
             onClick={playAgain}
             disabled={restarting}
             className="rounded-2xl bg-lime py-3 font-display font-bold text-ink disabled:opacity-60"
           >
-            {restarting ? "Building…" : "Play again"}
+            {restarting ? d.results.building : d.results.playAgain}
           </button>
         </div>
       </div>

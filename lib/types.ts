@@ -64,5 +64,7 @@ export type GameSummary = {
   rank: number;
   players: number;
   top: LeaderboardRow[];
+  /** Why the game is kept off the leaderboard (see lib/game/integrity.ts), or null if it counts. */
+  unranked: "too_fast" | null;
   rounds: (RevealTrack & { correct: boolean; points: number; elapsedMs: number })[];
 };

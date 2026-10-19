@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { answerRound, createGame, startRound } from "../game/engine";
 import type { Track } from "../types";
 import { type Db, migrate, pglite } from "./index";
-import { insertLiveGame, loadLiveGame, updateLiveGame } from "./liveGames";
+import { countRecentGames, insertLiveGame, loadLiveGame, updateLiveGame } from "./liveGames";
 
 const pool: Track[] = Array.from({ length: 12 }, (_, i) => ({
   id: `t${i}`, title: `T${i}`, artist: "A", album: "B", cover: "", previewUrl: `https://cdn/${i}`,
@@ -39,5 +39,15 @@ describe("live games", () => {
     const now = (await loadLiveGame(db, game.id))!;
     expect(now.version).toBe(1);
     expect(now.game.rounds[0].answer).toMatchObject({ optionId: null, points: 0 });
+  });
+
+  it("counts the games a player started recently", async () => {
+    const now = Date.now();
+    const other = { ...player, id: "00000000-0000-4000-8000-000000000002" };
+    for (const at of [now - 2 * 3_600_000, now - 30 * 60_000, now - 60_000]) {
+      await insertLiveGame(db, createGame(player, { id: "1", name: "A", genre: "", image: "" }, pool, Math.random, at));
+    }
+    await insertLiveGame(db, createGame(other, { id: "1", name: "A", genre: "", image: "" }, pool, Math.random, now));
+    expect(await countRecentGames(db, player.id, 3_600_000, now)).toBe(2);
   });
 });

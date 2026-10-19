@@ -12,10 +12,10 @@ const guest = (id: string, country: string | null = "FR"): User => ({ id, handle
 const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 /** Plays a game where the first `correct` rounds are answered right after 1 s (100 points each). */
-function play(user: User, artistId: string, correct: number, finishedAt: number) {
+function play(user: User, artistId: string, correct: number, finishedAt: number, elapsedMs = 1000) {
   const game = createGame(user, { id: artistId, name: `Artist ${artistId}`, genre: "", image: "" }, pool, Math.random, finishedAt - 60_000);
   game.rounds.forEach((r, i) => {
-    startRound(game, i, finishedAt - 1000);
+    startRound(game, i, finishedAt - elapsedMs);
     const option = r.options.find((o) => (i < correct ? o.trackId === r.trackId : o.trackId !== r.trackId))!;
     answerRound(game, i, option.id, finishedAt);
   });
@@ -46,6 +46,13 @@ describe("repo", () => {
     expect(await scores({ artistId: "1", period: "day" })).toEqual({ [a.handle]: 700, [b.handle]: 500 });
     expect(await scores({ period: "week" })).toEqual({ [a.handle]: 700, [b.handle]: 500 });
     expect(await playedArtists(db)).toEqual([{ id: "1", name: "Artist 1" }, { id: "2", name: "Artist 2" }]);
+  });
+
+  it("keeps inhumanly fast games off the leaderboard", async () => {
+    const [human, bot] = [guest(uid(1)), guest(uid(2))];
+    await recordResult(db, play(human, "1", 6, Date.now()));
+    await recordResult(db, play(bot, "1", 10, Date.now(), 50));
+    expect((await bestEntries(db, { artistId: "1" })).map((e) => e.handle)).toEqual([human.handle]);
   });
 
   it("records a game once, even for a session without a user row", async () => {

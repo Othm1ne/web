@@ -6,6 +6,9 @@ import { Equalizer } from "@/components/Logo";
 import { TimerRing } from "@/components/TimerRing";
 import { errorMessage } from "@/lib/client";
 import { decryptClip } from "@/lib/game/clip";
+import { activeDict } from "@/lib/i18n/active";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 import type { PublicGame, RevealResult } from "@/lib/types";
 
 type Phase = "loading" | "ready" | "countdown" | "buffering" | "playing" | "reveal" | "error";
@@ -54,6 +57,7 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export function GameClient() {
+  const { d } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [game, setGame] = useState<PublicGame | null>(null);
@@ -89,7 +93,7 @@ export function GameClient() {
       if (!res.ok) throw new Error(errorMessage(data.error));
       const g = data as PublicGame;
       if (g.finished) return router.replace(`/results/${id}`);
-      if (g.rounds.some((r) => r.answered)) throw new Error("This game was already started. Start a new one.");
+      if (g.rounds.some((r) => r.answered)) throw new Error(activeDict().game.alreadyStarted);
       setGame(g);
       clips.current = loadClips(
         g.rounds.map((r) => r.audioUrl),
@@ -146,7 +150,7 @@ export function GameClient() {
       try {
         clip = await clips.current[i];
       } catch {
-        return fail(new Error("A clip failed to load. Check your connection and start a new game."));
+        return fail(new Error(activeDict().game.clipFailed));
       }
       setRemaining(game.roundMs);
       setPhase("playing");
@@ -224,7 +228,7 @@ export function GameClient() {
         <div className="m-auto flex flex-col items-center gap-4 text-center">
           <p className="text-lg">{error}</p>
           <button onClick={() => router.push("/play")} className="rounded-2xl bg-lime px-6 py-3 font-bold text-ink">
-            Back to artists
+            {d.game.back}
           </button>
         </div>
       )}
@@ -232,7 +236,7 @@ export function GameClient() {
       {phase === "loading" && (
         <div className="m-auto flex flex-col items-center gap-4">
           <Equalizer />
-          <p className="text-mute">Loading the first clip…</p>
+          <p className="text-mute">{d.game.loadingFirst}</p>
         </div>
       )}
 
@@ -245,7 +249,7 @@ export function GameClient() {
           <h1 className="font-display text-3xl font-bold">{game.artist.name}</h1>
           {phase === "ready" ? (
             <button onClick={begin} className="rounded-2xl bg-lime px-10 py-4 font-display text-lg font-bold text-ink">
-              I&apos;m ready
+              {d.game.ready}
             </button>
           ) : (
             <span key={count} className="pop font-display text-7xl font-bold text-lime">{count}</span>
@@ -256,7 +260,7 @@ export function GameClient() {
       {phase === "buffering" && (
         <div className="m-auto flex flex-col items-center gap-4">
           <Equalizer />
-          <p className="text-mute">Loading the next clip…</p>
+          <p className="text-mute">{d.game.loadingNext}</p>
         </div>
       )}
 
@@ -272,11 +276,11 @@ export function GameClient() {
                 style={{ width: `${((index + (phase === "reveal" ? 1 : 0)) / game.rounds.length) * 100}%` }}
               />
             </div>
-            <span className="font-display text-sm font-bold text-lime">{total} pts</span>
-            <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} className="rounded-lg border border-line px-2 py-1 text-sm">
+            <span className="font-display text-sm font-bold text-lime">{fmt(d.common.pts, { n: total })}</span>
+            <button onClick={toggleMute} aria-label={muted ? d.common.unmute : d.common.mute} className="rounded-lg border border-line px-2 py-1 text-sm">
               {muted ? "🔇" : "🔊"}
             </button>
-            <button onClick={() => { audio.current?.pause(); router.push("/play"); }} aria-label="Quit" className="rounded-lg border border-line px-2 py-1 text-sm">
+            <button onClick={() => { audio.current?.pause(); router.push("/play"); }} aria-label={d.game.quit} className="rounded-lg border border-line px-2 py-1 text-sm">
               ✕
             </button>
           </div>
@@ -285,8 +289,8 @@ export function GameClient() {
             <div className="flex items-center justify-between rounded-3xl border border-line bg-panel p-6">
               <div className="flex flex-col gap-2">
                 <Equalizer />
-                <h1 className="font-display text-2xl font-bold">What song is this?</h1>
-                <p className="text-sm text-mute">The quicker you tap, the more you score.</p>
+                <h1 className="font-display text-2xl font-bold">{d.common.whatSong}</h1>
+                <p className="text-sm text-mute">{d.game.hint}</p>
               </div>
               <TimerRing remaining={remaining} total={game.roundMs} />
             </div>
@@ -297,11 +301,11 @@ export function GameClient() {
                 <img src={reveal.track.cover} alt="" className="h-28 w-28 shrink-0 rounded-2xl object-cover sm:h-36 sm:w-36" />
                 <div className="flex min-w-0 flex-col justify-center gap-1">
                   <span className={`pop font-display text-3xl font-bold ${reveal.correct ? "text-lime" : "text-coral"}`}>
-                    {reveal.correct ? `+${reveal.points}` : picked ? "Wrong" : "Time's up"}
+                    {reveal.correct ? `+${reveal.points}` : picked ? d.common.wrong : d.game.timesUp}
                   </span>
                   <p className="truncate font-display text-lg font-bold">{reveal.track.title}</p>
                   <p className="truncate text-sm text-mute">{reveal.track.artist} · {reveal.track.album}</p>
-                  {reveal.correct && <p className="text-xs text-mute">{(reveal.elapsedMs / 1000).toFixed(1)} s</p>}
+                  {reveal.correct && <p className="text-xs text-mute">{fmt(d.common.seconds, { n: (reveal.elapsedMs / 1000).toFixed(1) })}</p>}
                 </div>
               </div>
             )
@@ -316,7 +320,7 @@ export function GameClient() {
                   key={o.id}
                   disabled={phase !== "playing"}
                   onClick={() => submit(index, o.id)}
-                  className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                  className={`flex items-center gap-3 rounded-2xl border p-3 text-start transition ${
                     isAnswer
                       ? "border-lime bg-lime/10"
                       : isWrongPick
@@ -336,8 +340,8 @@ export function GameClient() {
 
           {phase === "reveal" && (
             <button onClick={next} className="relative mt-auto overflow-hidden rounded-2xl bg-panel-2 py-4 font-display font-bold">
-              <span className="fill-bar absolute inset-y-0 left-0 bg-line" style={{ animationDuration: `${REVEAL_MS}ms` }} />
-              <span className="relative">{isLast ? "See results" : "Next song"}</span>
+              <span className="fill-bar absolute inset-y-0 start-0 bg-line" style={{ animationDuration: `${REVEAL_MS}ms` }} />
+              <span className="relative">{isLast ? d.game.seeResults : d.common.nextSong}</span>
             </button>
           )}
         </>

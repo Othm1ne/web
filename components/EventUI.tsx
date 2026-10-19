@@ -1,4 +1,5 @@
 import type { StandingRow } from "@/lib/event/types";
+import { useI18n } from "@/lib/i18n/client";
 import type { PublicOption } from "@/lib/types";
 
 // Each option keeps the same letter and color on the big screen and on every phone.
@@ -45,12 +46,12 @@ export function OptionCard({
       type="button"
       disabled={!onClick}
       onClick={onClick}
-      className={`relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border-2 text-left transition ${frame} ${
+      className={`relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border-2 text-start transition ${frame} ${
         big ? "min-h-24 p-4 sm:min-h-28" : "min-h-20 p-3"
       } ${onClick ? "active:scale-[0.98]" : "cursor-default"}`}
     >
       {share !== null && (
-        <span className={`absolute inset-y-0 left-0 ${tone.fill} transition-all duration-700`} style={{ width: `${share}%` }} />
+        <span className={`absolute inset-y-0 start-0 ${tone.fill} transition-all duration-700`} style={{ width: `${share}%` }} />
       )}
       <span
         className={`relative flex shrink-0 items-center justify-center rounded-xl font-display font-bold text-ink ${tone.chip} ${
@@ -70,7 +71,8 @@ export function OptionCard({
 }
 
 export function Standings({ rows, limit = 10, big = false }: { rows: StandingRow[]; limit?: number; big?: boolean }) {
-  if (rows.length === 0) return <p className="text-mute">No players yet.</p>;
+  const { d } = useI18n();
+  if (rows.length === 0) return <p className="text-mute">{d.eventUI.noPlayers}</p>;
   return (
     <ol className="flex flex-col gap-2">
       {rows.slice(0, limit).map((row, i) => (
@@ -83,7 +85,7 @@ export function Standings({ rows, limit = 10, big = false }: { rows: StandingRow
           <span className="w-10 font-display font-bold text-cyan">#{row.rank}</span>
           <span className="flex-1 truncate">
             {row.handle}
-            {row.isYou && " (you)"}
+            {row.isYou && d.common.you}
           </span>
           <span className="font-display font-bold">{row.score}</span>
         </li>

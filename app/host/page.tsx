@@ -6,6 +6,9 @@ import { type User, ensureUser, errorMessage, googleSignInUrl } from "@/lib/clie
 import { SourceFill } from "@/components/host/SourceFill";
 import { type EventMode, MAX_CLIP_START_S } from "@/lib/event/types";
 import { normalizeTitle } from "@/lib/game/match";
+import { fmt } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
+import type { Dict } from "@/lib/i18n/dictionaries/en";
 import type { HostTrack } from "@/lib/types";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
@@ -19,15 +22,15 @@ type Picked = HostTrack & { startSec: number };
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 
 type AddTab = "search" | "artist" | "genre";
-const ADD_TABS: { id: AddTab; label: string }[] = [
-  { id: "search", label: "Search songs" },
-  { id: "artist", label: "From an artist" },
-  { id: "genre", label: "From a genre" },
+const ADD_TABS: { id: AddTab; label: (d: Dict) => string }[] = [
+  { id: "search", label: (d) => d.host.addSearch },
+  { id: "artist", label: (d) => d.host.addArtist },
+  { id: "genre", label: (d) => d.host.addGenre },
 ];
 
-const MODES: { id: EventMode; title: string; body: string }[] = [
-  { id: "screen", title: "Big screen + phones", body: "Your screen plays the music and shows the choices. Players answer on their phones." },
-  { id: "phones", title: "Everyone on their phone", body: "Each phone plays the music and shows the choices. No big screen needed." },
+const MODES: { id: EventMode; title: (d: Dict) => string; body: (d: Dict) => string }[] = [
+  { id: "screen", title: (d) => d.host.modeScreen, body: (d) => d.host.modeScreenBody },
+  { id: "phones", title: (d) => d.host.modePhones, body: (d) => d.host.modePhonesBody },
 ];
 
 function Cover({ src }: { src: string }) {
@@ -36,6 +39,7 @@ function Cover({ src }: { src: string }) {
 }
 
 export default function HostPage() {
+  const { d } = useI18n();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [mode, setMode] = useState<EventMode>("screen");
@@ -118,9 +122,7 @@ export default function HostPage() {
     }
     setPicked((list) => [...list, ...fresh]);
     setNotice(
-      fresh.length === 0
-        ? `No new songs added from ${from}: they're already in your list, or the list is full.`
-        : `Added ${fresh.length} ${fresh.length === 1 ? "song" : "songs"} from ${from}. Edit the list below as you like.`,
+      fmt(fresh.length === 0 ? d.host.noneAdded : fresh.length === 1 ? d.host.addedOne : d.host.addedMany, { n: fresh.length, from }),
     );
   }
 
@@ -172,15 +174,15 @@ export default function HostPage() {
     }
   }
 
-  if (!user) return <p className="m-auto text-mute">{error || "Loading…"}</p>;
+  if (!user) return <p className="m-auto text-mute">{error || d.common.loading}</p>;
 
   if (user.provider !== "google") {
     return (
       <div className="m-auto flex max-w-sm flex-col items-center gap-4 text-center">
-        <h1 className="font-display text-3xl font-bold">Host a live event</h1>
-        <p className="text-mute">Pick the songs, share a code, and play together like a quiz night. Hosting needs a Google account; players join with just a nickname.</p>
+        <h1 className="font-display text-3xl font-bold">{d.host.title}</h1>
+        <p className="text-mute">{d.host.pitch}</p>
         <a href={googleSignInUrl("/host")} className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink">
-          Sign in with Google
+          {d.common.signInGoogle}
         </a>
       </div>
     );
@@ -192,8 +194,8 @@ export default function HostPage() {
   return (
     <div className="flex flex-col gap-6 pb-28">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl font-bold">Host a live event</h1>
-        <p className="text-mute">Choose how to play, pick your songs, then share the code.</p>
+        <h1 className="font-display text-3xl font-bold">{d.host.title}</h1>
+        <p className="text-mute">{d.host.intro}</p>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2">
@@ -201,16 +203,16 @@ export default function HostPage() {
           <button
             key={m.id}
             onClick={() => setMode(m.id)}
-            className={`rounded-2xl border-2 p-4 text-left transition ${mode === m.id ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
+            className={`rounded-2xl border-2 p-4 text-start transition ${mode === m.id ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
           >
-            <p className="font-display text-lg font-bold">{m.title}</p>
-            <p className="mt-1 text-sm text-mute">{m.body}</p>
+            <p className="font-display text-lg font-bold">{m.title(d)}</p>
+            <p className="mt-1 text-sm text-mute">{m.body(d)}</p>
           </button>
         ))}
       </section>
 
       <section className="flex flex-col gap-3">
-        <div role="tablist" aria-label="Add songs" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1">
+        <div role="tablist" aria-label={d.host.addSongs} className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1">
           {ADD_TABS.map((t) => (
             <button
               key={t.id}
@@ -222,7 +224,7 @@ export default function HostPage() {
               }}
               className={`rounded-xl px-1 py-2 text-sm font-bold transition ${addTab === t.id ? "bg-lime text-ink" : "text-mute hover:text-white"}`}
             >
-              {t.label}
+              {t.label(d)}
             </button>
           ))}
         </div>
@@ -235,14 +237,14 @@ export default function HostPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search songs or artists…"
+              placeholder={d.host.searchSongs}
               className="rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-cyan"
             />
             {q.length >= 2 &&
               (results === null ? (
-                <p className="text-mute">Searching…</p>
+                <p className="text-mute">{d.host.searching}</p>
               ) : results.length === 0 ? (
-                <p className="text-mute">No songs found.</p>
+                <p className="text-mute">{d.host.noSongs}</p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {results.map((t) => {
@@ -251,14 +253,14 @@ export default function HostPage() {
                       <li key={t.id}>
                         <button
                           onClick={() => toggle(t)}
-                          className={`flex w-full items-center gap-3 rounded-xl border p-2 pr-3 text-left transition ${added ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-2 pe-3 text-start transition ${added ? "border-lime bg-lime/10" : "border-line bg-panel hover:border-cyan"}`}
                         >
                           <Cover src={t.cover} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{t.title}</p>
                             <p className="truncate text-xs text-mute">{t.artist} · {t.album}</p>
                           </div>
-                          <span className={`text-sm font-bold ${added ? "text-lime" : "text-cyan"}`}>{added ? "Added" : "+ Add"}</span>
+                          <span className={`text-sm font-bold ${added ? "text-lime" : "text-cyan"}`}>{added ? d.host.added : d.host.add}</span>
                         </button>
                       </li>
                     );
@@ -271,17 +273,17 @@ export default function HostPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium uppercase tracking-widest text-mute">
-          Your songs <span className="normal-case tracking-normal">({picked.length}/{MAX_SONGS}, at least {MIN_SONGS})</span>
+          {d.host.yourSongs} <span className="normal-case tracking-normal">{fmt(d.host.count, { n: picked.length, max: MAX_SONGS, min: MIN_SONGS })}</span>
         </h2>
         {picked.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-5 text-center text-sm text-mute">
-            Search below and add songs. Each song is one round: you choose which 10 seconds players hear.
+            {d.host.emptyList}
           </p>
         ) : (
           <>
             <ol className="flex flex-col gap-2">
               {picked.map((t, i) => (
-                <li key={t.id} className="flex flex-col gap-2 rounded-xl bg-panel p-2 pr-3">
+                <li key={t.id} className="flex flex-col gap-2 rounded-xl bg-panel p-2 pe-3">
                   <div className="flex items-center gap-3">
                     <span className="w-6 text-center font-display font-bold text-cyan">{i + 1}</span>
                     <Cover src={t.cover} />
@@ -289,14 +291,14 @@ export default function HostPage() {
                       <p className="truncate font-medium">{t.title}</p>
                       <p className="truncate text-xs text-mute">{t.artist}</p>
                     </div>
-                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↑</button>
-                    <button onClick={() => move(i, 1)} disabled={i === picked.length - 1} aria-label="Move down" className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↓</button>
-                    <button onClick={() => toggle(t)} aria-label="Remove" className="rounded-lg px-2 py-1 text-coral">✕</button>
+                    <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={d.host.moveUp} className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↑</button>
+                    <button onClick={() => move(i, 1)} disabled={i === picked.length - 1} aria-label={d.host.moveDown} className="rounded-lg px-2 py-1 text-mute hover:text-white disabled:opacity-30">↓</button>
+                    <button onClick={() => toggle(t)} aria-label={d.host.remove} className="rounded-lg px-2 py-1 text-coral">✕</button>
                   </div>
-                  <div className="flex items-center gap-3 pl-1 sm:pl-9">
+                  <div className="flex items-center gap-3 ps-1 sm:ps-9">
                     <button
                       onClick={() => (playing === t.id ? stopClip() : playClip(t))}
-                      aria-label={playing === t.id ? `Stop ${t.title}` : `Play the part players will hear of ${t.title}`}
+                      aria-label={fmt(playing === t.id ? d.host.stop : d.host.preview, { title: t.title })}
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm transition ${
                         playing === t.id ? "bg-lime text-ink" : "bg-panel-2 text-cyan hover:text-white"
                       }`}
@@ -313,10 +315,10 @@ export default function HostPage() {
                       // Replay from the new point once the host lets go, if this song was playing.
                       onPointerUp={(e) => playing === t.id && playClip(t, Number(e.currentTarget.value))}
                       onKeyUp={(e) => playing === t.id && playClip(t, Number(e.currentTarget.value))}
-                      aria-label={`Where ${t.title} starts`}
+                      aria-label={fmt(d.host.startsAt, { title: t.title })}
                       className="min-w-0 flex-1 accent-lime"
                     />
-                    <span className="w-20 shrink-0 text-right text-xs tabular-nums text-mute">
+                    <span className="w-20 shrink-0 text-end text-xs tabular-nums text-mute" dir="ltr">
                       {clock(t.startSec)}–{clock(t.startSec + CLIP_S)}
                     </span>
                   </div>
@@ -324,7 +326,7 @@ export default function HostPage() {
               ))}
             </ol>
             {picked.length > 1 && (
-              <button onClick={shuffle} className="self-start text-sm text-cyan hover:underline">Shuffle order</button>
+              <button onClick={shuffle} className="self-start text-sm text-cyan hover:underline">{d.host.shuffle}</button>
             )}
           </>
         )}
@@ -333,15 +335,15 @@ export default function HostPage() {
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-ink/90 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-bold">{picked.length} {picked.length === 1 ? "song" : "songs"}</p>
-            {error ? <p className="text-sm text-coral">{error}</p> : <p className="text-xs text-mute">{MODES.find((m) => m.id === mode)!.title}</p>}
+            <p className="font-display text-lg font-bold">{fmt(picked.length === 1 ? d.common.song : d.common.songs, { n: picked.length })}</p>
+            {error ? <p className="text-sm text-coral">{error}</p> : <p className="text-xs text-mute">{MODES.find((m) => m.id === mode)!.title(d)}</p>}
           </div>
           <button
             onClick={create}
             disabled={picked.length < MIN_SONGS || creating}
             className="rounded-2xl bg-lime px-6 py-3 font-display font-bold text-ink transition hover:scale-[1.03] disabled:opacity-50"
           >
-            {creating ? "Creating…" : "Create event"}
+            {creating ? d.host.creating : d.host.create}
           </button>
         </div>
       </div>
