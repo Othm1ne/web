@@ -74,8 +74,8 @@ export function genreFromSource(sourceId: string): Genre | undefined {
   return /^\d+$/.test(key) ? catalogById.get(Number(key)) : GENRES.find((g) => g.slug === key);
 }
 
-/** Valid game sources: an iTunes artist id, or a genre key. */
-export const SOURCE_ID = /^(\d{1,15}|genre-([a-z-]{2,20}|\d{1,9}))$/;
+/** Valid game sources: an iTunes artist id, a genre key, or a theme slug (see themes.ts). */
+export const SOURCE_ID = /^(\d{1,15}|genre-([a-z-]{2,20}|\d{1,9})|theme-[a-z0-9-]{2,30})$/;
 
 /** Lowercase, no accents, and punctuation as spaces: "Coupé-Décalé" → "coupe decale". */
 const fold = (s: string) =>

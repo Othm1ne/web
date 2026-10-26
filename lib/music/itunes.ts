@@ -14,6 +14,8 @@ const FEATURED = (process.env.FEATURED_ARTISTS ??
   "Taylor Swift,Daft Punk,Dua Lipa,The Weeknd,Billie Eilish,Coldplay,Stromae,Bad Bunny"
 ).split(",");
 const DAY = 24 * 60 * 60 * 1000;
+// Ids per lookup call: iTunes rejects very long id lists.
+const LOOKUP_BATCH = 100;
 
 type ItunesItem = {
   wrapperType?: string;
@@ -155,4 +157,20 @@ export const itunesProvider: MusicProvider = {
     const byId = new Map(items.map(toTrack).filter((t): t is Track => t !== null).map((t) => [t.id, t]));
     return ids.map((id) => byId.get(id)).filter((t): t is Track => Boolean(t));
   },
+
+  // Keyed by the id list too, so editing a theme takes effect without waiting a day.
+  themeTracks: (slug, ids) =>
+    cached(`theme:${slug}:${ids.length}:${ids.join("").length}`, DAY, async () => {
+      const found: Track[] = [];
+      for (let i = 0; i < ids.length; i += LOOKUP_BATCH) {
+        found.push(...(await itunesProvider.tracksByIds(ids.slice(i, i + LOOKUP_BATCH))));
+      }
+      const seen = new Set<string>();
+      return found.filter((t) => {
+        const key = normalizeTitle(t.title);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }),
 };

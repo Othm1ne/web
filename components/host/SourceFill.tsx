@@ -5,6 +5,8 @@ import { GenreSearch } from "@/components/GenreSearch";
 import { errorMessage } from "@/lib/client";
 import { useI18n } from "@/lib/i18n/client";
 import { GENRES, genreSourceId } from "@/lib/music/genres";
+import { themeName, themeSourceId } from "@/lib/music/themes";
+import { ThemePicker } from "@/components/ThemePicker";
 import type { ArtistSummary, HostTrack } from "@/lib/types";
 
 const COUNTS = [10, 15, 20];
@@ -19,11 +21,11 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 /**
- * Fills an event from one artist or one genre: random songs from the artist's catalog or the
- * genre's current chart. The host can still edit the list afterwards.
+ * Fills an event from one artist, genre or theme: random songs from the artist's catalog, the
+ * genre's current chart or the theme's curated list. The host can still edit the list afterwards.
  */
-export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill: (tracks: HostTrack[], from: string) => void }) {
-  const { d } = useI18n();
+export function SourceFill({ kind, onFill }: { kind: "artist" | "genre" | "theme"; onFill: (tracks: HostTrack[], from: string) => void }) {
+  const { d, locale } = useI18n();
   const [count, setCount] = useState(10);
   const [query, setQuery] = useState("");
   const [featured, setFeatured] = useState<ArtistSummary[] | null>(null);
@@ -82,10 +84,17 @@ export function SourceFill({ kind, onFill }: { kind: "artist" | "genre"; onFill:
             {n}
           </button>
         ))}
-        {kind === "artist" ? d.sourceFill.fromArtist : d.sourceFill.fromGenre}
+        {kind === "artist" ? d.sourceFill.fromArtist : kind === "theme" ? d.sourceFill.fromTheme : d.sourceFill.fromGenre}
       </div>
 
-      {kind === "artist" ? (
+      {kind === "theme" ? (
+        <ThemePicker
+          compact
+          busyId={loading}
+          disabled={loading !== null}
+          onPick={(t) => fill(themeSourceId(t.slug), themeName(t, locale))}
+        />
+      ) : kind === "artist" ? (
         <>
           <input
             type="search"

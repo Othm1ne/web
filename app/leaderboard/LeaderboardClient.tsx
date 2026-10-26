@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/client";
 import type { Dict } from "@/lib/i18n/dictionaries/en";
 import { fmt } from "@/lib/i18n/config";
 import { useI18n } from "@/lib/i18n/client";
+import { sourceName } from "@/lib/music/themes";
 import type { LeaderboardRow } from "@/lib/types";
 
 type Board = {
@@ -63,7 +64,7 @@ function Row({ row }: { row: LeaderboardRow }) {
 }
 
 export function LeaderboardClient() {
-  const { d } = useI18n();
+  const { d, locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -106,7 +107,7 @@ export function LeaderboardClient() {
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
           <Chip active={!artistId} onClick={() => set("artistId", "")}>{d.leaderboard.allArtists}</Chip>
           {data?.artists.map((a) => (
-            <Chip key={a.id} active={artistId === a.id} onClick={() => set("artistId", a.id)}>{a.name}</Chip>
+            <Chip key={a.id} active={artistId === a.id} onClick={() => set("artistId", a.id)}>{sourceName(a, locale)}</Chip>
           ))}
         </div>
         <div className="flex flex-wrap gap-2">

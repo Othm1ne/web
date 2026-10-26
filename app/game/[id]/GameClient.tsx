@@ -11,6 +11,7 @@ import { decryptClip } from "@/lib/game/clip";
 import { activeDict } from "@/lib/i18n/active";
 import { fmt } from "@/lib/i18n/config";
 import { useI18n } from "@/lib/i18n/client";
+import { sourceName } from "@/lib/music/themes";
 import type { PublicGame, RevealResult } from "@/lib/types";
 
 type Phase = "loading" | "ready" | "countdown" | "buffering" | "playing" | "reveal" | "error";
@@ -59,7 +60,7 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export function GameClient() {
-  const { d } = useI18n();
+  const { d, locale } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [game, setGame] = useState<PublicGame | null>(null);
@@ -278,7 +279,7 @@ export function GameClient() {
               </span>
             )}
           </div>
-          <h1 className="font-display text-4xl font-bold">{game.artist.name}</h1>
+          <h1 className="font-display text-4xl font-bold">{sourceName(game.artist, locale)}</h1>
           {phase === "ready" ? (
             <button onClick={begin} className="btn-press rounded-2xl bg-lime px-12 py-4 font-display text-xl font-bold text-ink">
               {d.game.ready}

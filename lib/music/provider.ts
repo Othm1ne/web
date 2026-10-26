@@ -14,6 +14,8 @@ export interface MusicProvider {
   tracksByIds(ids: string[]): Promise<Track[]>;
   /** Current popular songs in a genre, with a playable preview. */
   genreTracks(genre: Genre): Promise<Track[]>;
+  /** A theme's hand-picked songs by id, deduped by title. Cached, unlike tracksByIds. */
+  themeTracks(slug: string, ids: string[]): Promise<Track[]>;
 }
 
 export const music: MusicProvider = itunesProvider;

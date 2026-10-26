@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { CountdownNumber, OptionCard, Standings } from "@/components/EventUI";
 import { Equalizer, Logo } from "@/components/Logo";
+import { QrCode } from "@/components/QrCode";
 import { TimerRing } from "@/components/TimerRing";
 import { useEventAudio } from "@/lib/event/useEventAudio";
 import { fmt } from "@/lib/i18n/config";
@@ -91,6 +92,12 @@ export function HostClient() {
                 )}
               </p>
               <p className="font-display text-7xl font-bold tracking-[0.2em] text-lime sm:text-8xl" dir="ltr">{view.code}</p>
+              {host && (
+                <figure className="flex flex-col items-center gap-2 lg:items-start">
+                  <QrCode value={`${window.location.protocol}//${host}/e/${view.code}`} label={d.hostScreen.scanToJoin} className="w-44 p-1 sm:w-56" />
+                  <figcaption className="text-sm font-medium uppercase tracking-widest text-mute">{d.hostScreen.scanToJoin}</figcaption>
+                </figure>
+              )}
               <p className="max-w-md text-mute">
                 {onScreen ? d.hostScreen.screenInfo : d.hostScreen.phonesInfo}{" "}
                 {fmt(d.common.songs, { n: view.totalRounds })}.

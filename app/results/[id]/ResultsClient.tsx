@@ -11,6 +11,7 @@ import { sfx } from "@/lib/sfx";
 import { refreshStats } from "@/lib/usePlayerStats";
 import { fmt } from "@/lib/i18n/config";
 import { useI18n } from "@/lib/i18n/client";
+import { sourceName } from "@/lib/music/themes";
 import type { GameSummary } from "@/lib/types";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 
@@ -40,7 +41,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function ResultsClient() {
-  const { d } = useI18n();
+  const { d, locale } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<GameSummary | null>(null);
@@ -89,7 +90,7 @@ export function ResultsClient() {
       {celebrate && <Confetti />}
       <section className="relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-panel-2 to-panel p-6 text-center">
         <div className="absolute -top-24 h-48 w-72 rounded-full bg-gradient-to-r from-violet/40 via-pink/30 to-cyan/30 blur-3xl" aria-hidden />
-        <p className="relative text-xs uppercase tracking-widest text-mute">{summary.artist.name}</p>
+        <p className="relative text-xs uppercase tracking-widest text-mute">{sourceName(summary.artist, locale)}</p>
         <div className="relative flex gap-2" aria-label={`${stars}/3`}>
           {[0, 1, 2].map((i) => (
             <span

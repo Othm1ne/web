@@ -21,9 +21,10 @@ type Picked = HostTrack & { startSec: number };
 
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 
-type AddTab = "search" | "artist" | "genre";
+type AddTab = "search" | "theme" | "artist" | "genre";
 const ADD_TABS: { id: AddTab; label: (d: Dict) => string }[] = [
   { id: "search", label: (d) => d.host.addSearch },
+  { id: "theme", label: (d) => d.host.addTheme },
   { id: "artist", label: (d) => d.host.addArtist },
   { id: "genre", label: (d) => d.host.addGenre },
 ];
@@ -212,7 +213,7 @@ export default function HostPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <div role="tablist" aria-label={d.host.addSongs} className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1">
+        <div role="tablist" aria-label={d.host.addSongs} className="grid grid-cols-2 gap-1 sm:grid-cols-4 rounded-2xl border border-line bg-panel p-1">
           {ADD_TABS.map((t) => (
             <button
               key={t.id}

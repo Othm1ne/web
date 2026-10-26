@@ -4,17 +4,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type User, createGame, ensureUser, errorMessage, googleSignInUrl, renameUser, signOut } from "@/lib/client";
 import { GenreSearch } from "@/components/GenreSearch";
+import { ThemePicker } from "@/components/ThemePicker";
 import { ProgressCard } from "@/components/PlayerProgress";
 import { activeDict } from "@/lib/i18n/active";
 import { useI18n } from "@/lib/i18n/client";
+import type { Locale } from "@/lib/i18n/config";
 import { GENRES, type Genre, genreFromSource, genreSourceId } from "@/lib/music/genres";
+import { type Theme, themeFromSource, themeName, themeSourceId } from "@/lib/music/themes";
 import { useNavigationBusy } from "@/lib/useNavigationBusy";
 import type { ArtistSummary } from "@/lib/types";
 
-type Tab = "artist" | "genre";
+type Tab = "artist" | "theme" | "genre";
+const TABS: Tab[] = ["theme", "artist", "genre"];
 
-/** A genre presented as a game source (the game's title card). */
+/** A genre or theme presented as a game source (the game's title card). */
 const genreSource = (g: Genre): ArtistSummary => ({ id: genreSourceId(g.slug), name: g.name, genre: g.name, image: "" });
+const themeSource = (t: Theme, locale: Locale): ArtistSummary => ({ id: themeSourceId(t.slug), name: themeName(t, locale), genre: "", image: "" });
 
 function GenreTile({ genre, selected, onSelect }: { genre: Genre; selected: boolean; onSelect: () => void }) {
   return (
@@ -54,12 +59,16 @@ function ArtistCard({ artist, selected, onSelect }: { artist: ArtistSummary; sel
 }
 
 export function PlayClient() {
-  const { d } = useI18n();
+  const { d, locale } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
-  // /play?genre=pop (from the home screen) opens the genre tab with that genre picked.
+  // /play?genre=pop or /play?theme=80s (from the home screen) opens that tab with it picked.
   const linkedGenre = genreFromSource(genreSourceId(params.get("genre") ?? ""));
-  const [tab, setTab] = useState<Tab>(linkedGenre || params.get("tab") === "genre" ? "genre" : "artist");
+  const linkedTheme = themeFromSource(themeSourceId(params.get("theme") ?? ""));
+  const linkedTab = params.get("tab");
+  const [tab, setTab] = useState<Tab>(
+    linkedTheme ? "theme" : linkedGenre ? "genre" : linkedTab === "genre" || linkedTab === "theme" ? linkedTab : "artist",
+  );
   const [user, setUser] = useState<User | null>(null);
   const [google, setGoogle] = useState(false);
   const [edited, setHandle] = useState<string | null>(null);
@@ -67,7 +76,9 @@ export function PlayClient() {
   const [featured, setFeatured] = useState<ArtistSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<{ q: string; artists: ArtistSummary[] } | null>(null);
-  const [selected, setSelected] = useState<ArtistSummary | null>(linkedGenre ? genreSource(linkedGenre) : null);
+  const [selected, setSelected] = useState<ArtistSummary | null>(
+    linkedTheme ? themeSource(linkedTheme, locale) : linkedGenre ? genreSource(linkedGenre) : null,
+  );
   const [starting, setStarting] = useNavigationBusy();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -143,7 +154,7 @@ export function PlayClient() {
   const q = query.trim();
   const results = q.length >= 2 ? (search?.q === q ? search.artists : null) : null;
   const list = q.length >= 2 ? results : featured;
-  const isGenre = selected?.id.startsWith("genre-") ?? false;
+  const kindLabel = selected?.id.startsWith("theme-") ? d.play.theme : selected?.id.startsWith("genre-") ? d.play.genre : d.play.artist;
 
   return (
     <div className="flex flex-col gap-6 pb-44 sm:pb-28">
@@ -186,8 +197,8 @@ export function PlayClient() {
       ) : null)}
       {notice && <p className="-mt-3 text-sm text-coral">{notice}</p>}
 
-      <div role="tablist" aria-label={d.play.gameType} className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-panel p-1">
-        {(["artist", "genre"] as const).map((t) => (
+      <div role="tablist" aria-label={d.play.gameType} className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1">
+        {TABS.map((t) => (
           <button
             key={t}
             role="tab"
@@ -195,12 +206,17 @@ export function PlayClient() {
             onClick={() => setTab(t)}
             className={`rounded-xl py-2.5 font-display font-bold transition ${tab === t ? "bg-lime text-ink" : "text-mute hover:text-white"}`}
           >
-            {t === "artist" ? d.play.byArtist : d.play.byGenre}
+            {t === "artist" ? d.play.byArtist : t === "theme" ? d.play.byTheme : d.play.byGenre}
           </button>
         ))}
       </div>
 
-      {tab === "genre" ? (
+      {tab === "theme" ? (
+        <section className="flex flex-col gap-3">
+          <p className="text-sm text-mute">{d.play.themeIntro}</p>
+          <ThemePicker selectedId={selected?.id} onPick={(t) => select(themeSource(t, locale))} />
+        </section>
+      ) : tab === "genre" ? (
         <section className="flex flex-col gap-3">
           <p className="text-sm text-mute">{d.play.genreIntro}</p>
           <GenreSearch onPick={(g) => select(genreSource(g))} />
@@ -243,7 +259,7 @@ export function PlayClient() {
         <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-ink/90 px-4 py-3 backdrop-blur-lg sm:bottom-0 sm:py-4">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-widest text-mute">{isGenre ? d.play.genre : d.play.artist}</p>
+              <p className="text-xs uppercase tracking-widest text-mute">{kindLabel}</p>
               <p className="truncate font-display text-lg font-bold">{selected.name}</p>
               {error && <p className="text-sm text-coral">{error}</p>}
             </div>

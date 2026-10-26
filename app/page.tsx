@@ -8,6 +8,7 @@ import { TimerRing } from "@/components/TimerRing";
 import type { Dict } from "@/lib/i18n/dictionaries/en";
 import { getI18n } from "@/lib/i18n/server";
 import { GENRES } from "@/lib/music/genres";
+import { THEMES, themeName } from "@/lib/music/themes";
 
 // Made-up titles for the decorative game card.
 const MOCK_OPTIONS = ["Midnight Static", "Paper Satellites", "Golden Hour Drive", "Neon Lullaby"];
@@ -44,7 +45,7 @@ function MockRound({ d }: { d: Dict }) {
 }
 
 export default async function Landing() {
-  const { d } = await getI18n();
+  const { d, locale } = await getI18n();
   const h = d.home;
   const modes = [
     { href: "/play", icon: "🎤", title: h.modeArtist, body: h.modeArtistBody, tone: "from-lime/25 hover:border-lime" },
@@ -114,6 +115,29 @@ export default async function Landing() {
                 {m.title} <span className="inline-block text-lime transition group-hover:translate-x-1 rtl:-scale-x-100">→</span>
               </span>
               <span className="text-sm text-mute">{m.body}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-display text-2xl font-bold">{h.jumpTheme}</h2>
+          <Link href="/play?tab=theme" className="text-sm text-cyan hover:underline">
+            {h.allThemes}
+          </Link>
+        </div>
+        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2">
+          {THEMES.map((t) => (
+            <Link
+              key={t.slug}
+              href={`/play?theme=${t.slug}`}
+              className={`relative flex h-28 w-36 shrink-0 items-end overflow-hidden rounded-2xl bg-gradient-to-br p-3 transition hover:scale-[1.03] ${t.tone}`}
+            >
+              <span className="absolute -right-1 -top-1 text-4xl opacity-80" aria-hidden>
+                {t.icon}
+              </span>
+              <span className="relative font-display font-bold leading-tight text-white drop-shadow">{themeName(t, locale)}</span>
             </Link>
           ))}
         </div>
