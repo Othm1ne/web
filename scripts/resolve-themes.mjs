@@ -9,6 +9,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(root, "lib/music/themeTracks.json");
 const COUNTRY = process.env.MUSIC_COUNTRY ?? "US";
+// Themes searched in another store, because many of their songs are only sold there. The app
+// falls back to these stores when looking ids up (FALLBACK_STORES in lib/music/itunes.ts).
+const THEME_STORE = { "french-classics": "FR", "french-pop": "FR", "rap-fr": "FR" };
 // iTunes allows roughly 20 calls a minute.
 const GAP_MS = 3100;
 
@@ -68,9 +71,9 @@ function score(item, artist, title) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let last = 0;
-async function search(term) {
+async function search(term, country) {
   const url = new URL("https://itunes.apple.com/search");
-  for (const [k, v] of Object.entries({ term, entity: "song", limit: "25", country: COUNTRY })) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries({ term, entity: "song", limit: process.env.SEARCH_LIMIT ?? "25", country })) url.searchParams.set(k, v);
   for (let attempt = 0; ; attempt++) {
     await wait(Math.max(0, last + GAP_MS - Date.now()));
     last = Date.now();
@@ -94,12 +97,14 @@ function best(items, artist, title) {
   return pick?.it ?? null;
 }
 
-async function resolve(song) {
+async function resolve(song, country) {
   const [artist, title] = song.split("|");
   const plain = (s) => s.replace(/\s*[([].*?[)\]]/g, "").trim();
-  let hit = best(await search(`${plain(artist)} ${plain(title)}`), artist, title);
+  let hit = best(await search(`${plain(artist)} ${plain(title)}`, country), artist, title);
   // Long combined terms sometimes miss; the title alone, filtered by artist, often finds it.
-  if (!hit) hit = best(await search(plain(title)), artist, title);
+  if (!hit) hit = best(await search(plain(title), country), artist, title);
+  // Some songs are only sold in France (the app looks ids up there too).
+  if (!hit && country !== "FR") hit = best(await search(`${plain(artist)} ${plain(title)}`, "FR"), artist, title);
   return hit;
 }
 
@@ -111,7 +116,7 @@ for (const [slug, songs] of Object.entries(THEME_SONGS)) {
   console.log(`${slug}: ${songs.length} songs, ${todo.length} to look up`);
   for (const song of todo) {
     try {
-      const hit = await resolve(song);
+      const hit = await resolve(song, THEME_STORE[slug] ?? COUNTRY);
       known[song] = hit ? String(hit.trackId) : null;
       console.log(hit ? `  ✓ ${song} → ${hit.artistName} — ${hit.trackName}` : `  ✗ ${song}`);
     } catch (e) {

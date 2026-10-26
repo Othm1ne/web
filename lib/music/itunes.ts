@@ -16,6 +16,9 @@ const FEATURED = (process.env.FEATURED_ARTISTS ??
 const DAY = 24 * 60 * 60 * 1000;
 // Ids per lookup call: iTunes rejects very long id lists.
 const LOOKUP_BATCH = 100;
+// Stores tried for ids the main store lacks: some theme songs (French variété, rap FR) are only
+// sold in France. Their previews play from anywhere.
+const FALLBACK_STORES = ["FR"].filter((c) => c !== COUNTRY);
 
 type ItunesItem = {
   wrapperType?: string;
@@ -40,9 +43,9 @@ const cache = (holder.__musicCache ??= createCache(
 ));
 const cached = cache.get;
 
-async function call(endpoint: "search" | "lookup", params: Record<string, string>): Promise<ItunesItem[]> {
+async function call(endpoint: "search" | "lookup", params: Record<string, string>, country = COUNTRY): Promise<ItunesItem[]> {
   const url = new URL(endpoint, "https://itunes.apple.com/");
-  for (const [k, v] of Object.entries({ ...params, country: COUNTRY })) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries({ ...params, country })) url.searchParams.set(k, v);
   const res = await fetch(url, { cache: "no-store" });
   if (res.status === 403 || res.status === 429) throw new GameError("music_rate_limited", 503);
   if (!res.ok) throw new GameError("music_unavailable", 502);
@@ -153,8 +156,12 @@ export const itunesProvider: MusicProvider = {
   // Not cached: called once per event, and the preview URLs must be current.
   tracksByIds: async (ids) => {
     if (ids.length === 0) return [];
-    const items = await call("lookup", { id: ids.join(",") });
-    const byId = new Map(items.map(toTrack).filter((t): t is Track => t !== null).map((t) => [t.id, t]));
+    const byId = new Map<string, Track>();
+    for (const country of [COUNTRY, ...FALLBACK_STORES]) {
+      const missing = ids.filter((id) => !byId.has(id));
+      if (missing.length === 0) break;
+      for (const t of (await call("lookup", { id: missing.join(",") }, country)).map(toTrack)) if (t) byId.set(t.id, t);
+    }
     return ids.map((id) => byId.get(id)).filter((t): t is Track => Boolean(t));
   },
 
